@@ -6,6 +6,7 @@ from torchvision import datasets, transforms
 from torch.autograd import Variable
 import numpy as np
 '''
+Use the gene expression profile to predict all 221 drugs response one time and also called dimensionality reducation
 下面哟啊开始使用神经网络来降维了，就是通过输入基因的表达值，然后将200多个药物一起预测cell line 对这些药物的反应
 '''
 
@@ -45,6 +46,7 @@ number_drug=221
 LR=0.05
 
 model=Net()
+#for the selection of optimizer ,we test all four different optimizer to select the methods which is suit for our data 
 #其中对于优化器而言，我们可以在试过之后做出选择嘛，还有一个就是优化器的参数设置，其中的lr是learning rate
 optimizer= torch.optim.SGD(model.parameters(), lr=LR) 
 #opt_Momentum = torch.optim.SGD(model.parameters(), lr=LR, momentum=0.5) 
