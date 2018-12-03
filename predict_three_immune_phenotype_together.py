@@ -6,7 +6,10 @@ from torchvision import datasets, transforms
 from torch.autograd import Variable
 import numpy as np
 
-
+'''
+Use the expression of immune pathway genes to predict immune phenotype.such as inflamed, excluded, desert
+The labels of sample in one column and 0,1,2
+'''
 def genTrainTest(dat):
     N,L=dat.shape #return the size of dat
     print dat.shape
@@ -21,8 +24,8 @@ def genTrainTest(dat):
 def Accuracy(pred,label):
     pred=pred.cpu().data.numpy()#np.argmax(pred,1) is get the predict classifier result 
     label=label.cpu().data.numpy()
-    test_np=(np.argmax(pred,1) == label)#compare the result with real classifier
-    test_np=np.float32(test_np)
+    test_np=(np.argmax(pred,1) == label)#compare the result with real classifier,"argmax" calculate the row("1") max 的位置
+    test_np=np.float32(test_np)#translate the true false into numeric
     return np.mean(test_np)
 
 def Test_class(pred):
