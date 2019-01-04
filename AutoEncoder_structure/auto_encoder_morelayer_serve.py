@@ -20,24 +20,26 @@ def genTrainTest(dat,number_gene):
 class AtuoEncoder(nn.Module):
     def __init__(self):
         super(AtuoEncoder,self).__init__()
+        #the input size 1*13102
+        #the output 16*2180
         self.encod1=nn.Sequential(
             nn.Conv1d(in_channels=1,out_channels=16,kernel_size=13,stride=1),
             nn.Tanh(),
             nn.MaxPool1d(16,stride=6,return_indices=True)
             )
-        
+        #output 32*360
         self.encod2=nn.Sequential(
             nn.Conv1d(16,32,kernel_size=13,stride=1),
             nn.Tanh(),
             nn.MaxPool1d(14,stride=6,return_indices=True)
             )
-
+         #output 64*57
         self.encod3=nn.Sequential(
             nn.Conv1d(32,64,kernel_size=13,stride=1),
             nn.Tanh(),
             nn.MaxPool1d(12,stride=6,return_indices=True)
             )
-
+          #output 128*6
         self.encod4=nn.Sequential(
             nn.Conv1d(64,128,kernel_size=13,stride=1),
             nn.Tanh(),
