@@ -1,5 +1,5 @@
 ﻿#build a auto-encoder structure to 
-#构建去卷积的神经网络
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,28 +17,32 @@ def genTrainTest(dat,number_gene):
     return traindat,trainlabel  
 
 #there are three CNN layer in encoder
-#no matter how much layers, when there is enough epochs ,the result is always same.
+#4 layers encoder and 4 layers for decoder.
+#the internal 128*152. 
+#That meaning each sample 13102 gene expression value was transform 128*152 ,then use the 128*152 to predict the essential
+#IN Maxpool the stride=3
 class AtuoEncoder(nn.Module):
     def __init__(self):
         super(AtuoEncoder,self).__init__()
+        #output 16*4361
         self.encod1=nn.Sequential(
             nn.Conv1d(in_channels=1,out_channels=16,kernel_size=11,stride=1),
             nn.Tanh(),
             nn.MaxPool1d(12,stride=3,return_indices=True)
             )
-        
+        #output 32*1447
         self.encod2=nn.Sequential(
             nn.Conv1d(16,32,kernel_size=11,stride=1),
             nn.Tanh(),
             nn.MaxPool1d(13,stride=3,return_indices=True)
             )
-
+        #output 64*1447
         self.encod3=nn.Sequential(
             nn.Conv1d(32,64,kernel_size=11,stride=1),
             nn.Tanh(),
             nn.MaxPool1d(12,stride=3,return_indices=True)
             )
-
+        #output 128*152
         self.encod4=nn.Sequential(
             nn.Conv1d(64,128,kernel_size=11,stride=1),
             nn.Tanh(),
