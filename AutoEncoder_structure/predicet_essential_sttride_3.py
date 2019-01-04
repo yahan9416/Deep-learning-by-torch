@@ -190,8 +190,6 @@ for i in range(subtensor.shape[0]):
     fs1.write("\n")
 fs1.close()
 
-
-
 fs2=open("/Users/yahan/Desktop/predicted_gene_essential/test_essential_test_predict_value_3.txt","w")
 subtensor=testouts.data.numpy()
 splitter = "\t"
