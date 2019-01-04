@@ -1,1 +1,16 @@
 
+In this file folder, always use the auto-encoder structure and in this structure each layer is a convolution nueral neetwork or a deconvolution.
+In the neural network,divide into convolution part and maxpool part. 
+
+In the convolution part :
+   inputsize**input_channel
+   the output size = [input_size-(kernel_size - stride)]
+   output size * output_channel
+   
+In the maxpool part:
+   inputsize**input_channel
+   the output size = [inputsize-(kernel_szie-stride)]/stride
+   output size * output_channel
+   
+Deconvolution  part :
+  first is unmaxpool and then is unconvolution. the parameter(including kernel_size,stride) is same to convolution 
