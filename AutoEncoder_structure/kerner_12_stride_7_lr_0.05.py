@@ -1,6 +1,6 @@
-#build a auto-encoder structure with more little stride = 3,,so we can capture more information in the orignal dataset. 
-#only in shrna data set ,and devide the data set into train and test data set and then calculate the correlationship 
-#for stride 3,two different way,this is little_layer
+#build a auto-encoder structure, 4 convolution neural network layers is coder part and 4 deconvolution neural layers for decoder partion
+#this is the best model after test the kerner size from 12 to 15 , stride from 5 to 7 and the learning rate form 0.0 to 0.05
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -33,7 +33,6 @@ class AtuoEncoder(nn.Module):
             nn.Conv1d(in_channels=1,out_channels=32,kernel_size=15,stride=1)
             )
 
-
         self.encod2=nn.Sequential(
             nn.Conv1d(32,64,kernel_size=10,stride=1)
             )
@@ -46,8 +45,6 @@ class AtuoEncoder(nn.Module):
             nn.Conv1d(128,256,kernel_size=4,stride=1)
             )
  
-
-
 
         self.decod1=nn.Sequential(
             nn.ConvTranspose1d(256,128,kernel_size=4,stride=1)
@@ -138,10 +135,6 @@ traindat=traindat.view(202,1,13102)
 trainlabel=trainlabel.view(202,1,13102)
 validat=validat.view(43,1,13102)
 validlabel=validlabel.view(43,1,13102)
-
-
-
-
 
 
 rec=open("/mnt/Storage/home/tuser/hanya/predicet_gene_essential_autoencoder/three_part_predict/kerner_12_stride_7_lr_0.05/kerner_12_stride_7_lr_0.05.txt","w")
