@@ -14,3 +14,12 @@ In the maxpool part:
    
 Deconvolution  part :
   first is unmaxpool and then is unconvolution. the parameter(including kernel_size,stride) is same to convolution 
+
+The nor_loss_mse_withstd.py file is used to predict gene essential score by the normalized crispr data and use “mse( (aa - mean_c(aa))/sd(aa)  , (pred - mean_c(pred))/sd(pred))” 
+as the loss value calculated method.
+
+The nor_loss_mse_without_std.py file is used to predict gene essential score by the normalized crispr data and use “mse( (aa - mean_c(aa)), (pred - mean_c(pred))” 
+as the loss value calculated method.
+
+The nor_loss_pearson.py file is used to predict gene essential score by the normalized crispr data and use “1-pearson correlation(aa)” 
+as the loss value calculated method.
