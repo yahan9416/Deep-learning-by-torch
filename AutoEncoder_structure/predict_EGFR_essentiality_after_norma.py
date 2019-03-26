@@ -1,6 +1,4 @@
-#build a auto-encoder structure with more little stride = 3,,so we can capture more information in the orignal dataset. 
-#only in shrna data set ,and devide the data set into train and test data set and then calculate the correlationship 
-#for stride 3,two different way,this is little_layer
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,7 +10,7 @@ import os
 import tensorflow as tf
 import pandas as pd
 
-
+#half of cell line is used to train model and another cell line is used to test model
 def genTrainTest(dat,number_gene):
     N,L=dat.shape
     train_number=int(N*0.5) 
