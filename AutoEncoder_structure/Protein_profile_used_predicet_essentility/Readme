@@ -1,1 +1,5 @@
 This fold is use the profile of Protein proflie in Depmap to predict the essentiality of gene which protein level have be measured. 
+
+Cell_unit means that each input is all protein levels in one cell line and each output are gene essentiality of a cell line.
+
+Gene Unit means that each input is one protein levels across all cell line and each output is one gene essentiality across cell line.
