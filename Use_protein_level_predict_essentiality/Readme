@@ -1,1 +1,10 @@
 This folder store the datas which is used to predict gene essentiality by protein profile.
+
+Cell unit:
+predict all gene essentiality in one cell line at one times.
+
+Gene unit:
+predict one gene all essentiality across cell line at one times.
+
+with cancer type:
+encode the cancer type by one-hot-encoding and add the cancer type as input
