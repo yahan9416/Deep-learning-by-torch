@@ -1,0 +1,367 @@
+---
+title: "Test the performance of different features."
+output: html_document
+---
+
+```{r}
+#First, we try to see the correlation distribution between predict and actually.
+essentiality=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_collect/Crispr_across_cell_Line_normalized.rds")
+
+setwd("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/")
+positive_pre=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_Negat_Posi/posi_linear_model_test_predict.rds")
+negative_pre=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_Negat_Posi/linear_model_test_predict.rds")
+abs_pre=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top10_abs_linear/Abs_linear_model_test_predict.rds")
+#look at the feature contribution.
+dim(positive_pre)#one columne is one gene.
+dim(essentiality)#one columne is one gene.
+
+cor_gene_posi=apply(matrix(1:16371),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(essentiality[386:551,x]))),as.numeric(as.vector(unlist(positive_pre[,x])))))[c(3,4)])
+cor_gene_posi=data.frame(t(cor_gene_posi))
+cor_gene_posi$estimate.cor=as.numeric(as.vector(unlist(cor_gene_posi$estimate.cor)))
+
+cor_gene_neig=apply(matrix(1:16371),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(essentiality[386:551,x]))),as.numeric(as.vector(unlist(negative_pre[,x])))))[c(3,4)])
+cor_gene_neig=data.frame(t(cor_gene_neig))
+cor_gene_neig$estimate.cor=as.numeric(as.vector(unlist(cor_gene_neig$estimate.cor)))
+
+cor_gene_abs=apply(matrix(1:16371),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(essentiality[386:551,x]))),as.numeric(as.vector(unlist(abs_pre[,x])))))[c(3,4)])
+cor_gene_abs=data.frame(t(cor_gene_abs))
+cor_gene_abs$estimate.cor=as.numeric(as.vector(unlist(cor_gene_abs$estimate.cor)))
+
+saveRDS(cor_gene_posi,"/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_Negat_Posi/Posi_linear_model_test_predict_gene_cor.rds")
+saveRDS(cor_gene_neig,"/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_Negat_Posi/Neg_linear_model_test_predict_gene_cor.rds")
+saveRDS(cor_gene_abs,"/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top10_abs_linear/Abs_linear_model_test_predict_gene_cor.rds")
+
+library(ggplot2)
+p<-ggplot(cor_gene_neig, aes(x=estimate.cor)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Top10 expression negative correlated essentiality feature line regression")+scale_x_continuous( limits=c(-0.2, 0.8))
+ggsave("Negative_correlated_feature_line_model.pdf")
+
+library(ggplot2)
+p1<-ggplot(cor_gene_posi, aes(x=estimate.cor)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Top10 expression positive correlated essentiality feature line regression")+scale_x_continuous( limits=c(-0.2, 0.8))
+ggsave("Positive_correlated_feature_line_model.pdf")
+
+library(ggplot2)
+p2<-ggplot(cor_gene_abs, aes(x=estimate.cor)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Top10 expression absolute correlated essentiality feature line regression")+scale_x_continuous( limits=c(-0.2, 0.8))
+ggsave("Absolute_correlated_feature_line_model.pdf")
+
+#try to plot three figure into one panel
+library(ggpubr)
+ggarrange(p1,p,p2,nrow = 3, 
+          labels = c("A","B","C"))#this just put three figure together
+ggsave("Three_kind_of_correlated_feature_line_model.pdf",height = 6)
+
+
+mean(cor_gene_abs$estimate.cor)#0.23
+mean(cor_gene_neig$estimate.cor)#0.19
+mean(cor_gene_posi$estimate.cor,na.rm = T)#0.20
+
+
+setwd("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_selection_linear_model/Co_exp_ess_Line_regression/")
+library(xgboost)
+negative_model=readRDS("model.rds")
+positive_model=readRDS("posi_model.rds")
+absolute_model=readRDS("Abs_model.rds")
+length(negative_model)
+negative_model[[1]]
+feature_name=absolute_model[[1]][["feature_names"]]
+gene_name=readRDS("Feature_matrix_gene_order.rds")
+#saveRDS(gene_name,file="Feature_matrix_gene_order.rds")
+#instead of each feature have been using into build model in the xgboost linear-regression model
+
+extract_feature_importance<-function(x){
+  feature_gain=xgb.importance( model = x)
+  index=match(feature_name,feature_gain$Feature)
+  return(as.vector(unlist(feature_gain$Gain[index])))
+}
+negative_result=matrix(unlist(lapply(negative_model,extract_feature_importance)),ncol=10,byrow=T)
+colnames(negative_result)=feature_name
+saveRDS(negative_result,file="Negative_cor_Xgboost_Linear_feature_Gain.rds")
+
+abs_result=matrix(unlist(lapply(absolute_model,extract_feature_importance)),ncol=10,byrow=T)
+colnames(abs_result)=feature_name
+saveRDS(abs_result,file="Abosulate_cor_Xgboost_Linear_feature_Gain.rds")
+
+pos_result=matrix(unlist(lapply(positive_model,extract_feature_importance)),ncol=10,byrow=T)
+colnames(pos_result)=feature_name
+saveRDS(pos_result,file="Positive_cor_Xgboost_Linear_feature_Gain.rds")
+
+#In linear and SVM model, absolute feature both are better than others, so we just need to calculate features contribution in the absolute correlation feature matirx
+feature_contribution=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Negative_cor_Xgboost_Linear_feature_Gain.rds")
+feature_contribution[which(is.na(feature_contribution))]=0
+feature_contribution[1:5,1:5]+1
+dim(feature_contribution)
+max(feature_contribution)
+data=data.frame(Feature_contribution=as.vector(feature_contribution),Feature_name=rep(colnames(feature_contribution),each=16371))
+
+
+library(ggplot2)
+p2<-ggplot(data, aes(x=Feature_name,y=Feature_contribution)) + 
+  geom_boxplot(color="black", fill="white",outlier.size = 0.8)+ggtitle("Feature contribution in Absolute correlated feature list")+theme(axis.text.x = element_text(angle=45))+scale_y_continuous( limits=c(0, 0.5))+scale_x_discrete(limits=colnames(feature_contribution))
+ggsave("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Feature_contribution_abs.pdf",height = 6,width = 6)
+
+```
+
+
+
+
+
+
+```{r}
+#process SVM model result 
+#output train correlation coefficient and the predict essentiality in test dataset.
+#corresponding to the xgboost linear regression model test the performance in test dataset.
+essentiality=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_collect/Crispr_across_cell_Line_normalized.rds")
+
+setwd("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_SVM/")
+positive_pre=t(readRDS("posi_SVM_test_predict.rds"))
+negative_pre=t(readRDS("neig_SVM_test_predict.rds"))
+abs_pre=t(readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_SVM/abs_SVM_test_predict.rds"))
+
+dim(positive_pre)#one columne is one gene.
+dim(essentiality)#one columne is one gene.
+
+cor_gene_posi=apply(matrix(1:16371),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(essentiality[386:551,x]))),as.numeric(as.vector(unlist(positive_pre[,x])))))[c(3,4)])
+cor_gene_posi=data.frame(t(cor_gene_posi))
+cor_gene_posi$estimate.cor=as.numeric(as.vector(unlist(cor_gene_posi$estimate.cor)))
+
+cor_gene_neig=apply(matrix(1:16371),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(essentiality[386:551,x]))),as.numeric(as.vector(unlist(negative_pre[,x])))))[c(3,4)])
+cor_gene_neig=data.frame(t(cor_gene_neig))
+cor_gene_neig$estimate.cor=as.numeric(as.vector(unlist(cor_gene_neig$estimate.cor)))
+
+cor_gene_abs=apply(matrix(1:16371),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(essentiality[386:551,x]))),as.numeric(as.vector(unlist(abs_pre[,x])))))[c(3,4)])
+cor_gene_abs=data.frame(t(cor_gene_abs))
+cor_gene_abs$estimate.cor=as.numeric(as.vector(unlist(cor_gene_abs$estimate.cor)))
+rownames(cor_gene_abs)=colnames(essentiality)
+saveRDS(cor_gene_abs,"/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_SVM/abs_SVM_test_predict_correlation.rds")
+
+library(ggplot2)
+p<-ggplot(cor_gene_neig, aes(x=estimate.cor)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Top10 expression negative correlated essentiality feature SVM")+scale_x_continuous( limits=c(-0.2, 0.8))
+ggsave("Negative_correlated_feature_SVM.pdf")
+
+library(ggplot2)
+p1<-ggplot(cor_gene_posi, aes(x=estimate.cor)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Top10 expression positive correlated essentiality feature SVM")+scale_x_continuous( limits=c(-0.2, 0.8))
+ggsave("Positive_correlated_feature_SVM.pdf")
+
+library(ggplot2)
+p2<-ggplot(cor_gene_abs, aes(x=estimate.cor)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Top10 expression absolute correlated essentiality feature SVM")+scale_x_continuous( limits=c(-0.2, 0.8))
+ggsave("Absolute_correlated_feature_SVM.pdf")
+
+#try to plot three figure into one panel
+library(ggpubr)
+ggarrange(p1,p,p2,nrow = 3, 
+          labels = c("A","B","C"))#this just put three figure together
+ggsave("Three_kind_of_correlated_feature_SVM.pdf",height = 6)
+
+
+mean(cor_gene_abs$estimate.cor)#0.20
+mean(cor_gene_neig$estimate.cor)#0.17
+mean(cor_gene_posi$estimate.cor,na.rm = T)#0.18
+
+```
+
+
+
+
+```{r}
+essentiality=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_collect/Crispr_across_cell_Line_normalized.rds")
+setwd("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/")
+abs_pre=readRDS("Abs_linear_model_test_predict.rds")
+#look at the feature contribution.
+dim(abs_pre)
+dim(essentiality)
+cor_gene_abs=apply(matrix(1:16371),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(essentiality[386:551,x]))),as.numeric(as.vector(unlist(abs_pre[,x])))))[c(3,4)])
+cor_gene_abs=data.frame(t(cor_gene_abs))
+cor_gene_abs$estimate.cor=as.numeric(as.vector(unlist(cor_gene_abs$estimate.cor)))
+mean(cor_gene_abs$estimate.cor)#0.2323
+rownames(cor_gene_abs)=colnames(essentiality)
+colnames(cor_gene_abs)=c("P_value","Spearman.Correlation")
+
+match("138716",colnames(essentiality))
+data=data.frame(predict_ess=abs_pre[,15547],actual_ess=essentiality[386:551,15547])
+ggplot(data, aes(x = actual_ess, y = predict_ess)) + geom_point()
+ggsave("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/abs_model_best_gene_model_distribution.pdf")
+
+match("388649",colnames(essentiality))
+data=data.frame(predict_ess=abs_pre[,9359],actual_ess=essentiality[386:551,9359])
+ggplot(data, aes(x = actual_ess, y = predict_ess)) + geom_point()
+ggsave("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/abs_model_worst_gene_model_distribution.pdf")
+```
+
+
+
+
+
+
+```{r}
+#we find the performance of absolute top 10 gene features is best.
+#then we look at the performance of PRgenes, and the Red or Blue genes.
+essentiality=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_collect/Crispr_across_cell_Line_normalized.rds")
+
+setwd("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/")
+abs_pre=readRDS("Abs_linear_model_test_predict.rds")
+#look at the feature contribution.
+
+cor_gene_abs=apply(matrix(1:16371),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(essentiality[386:551,x]))),as.numeric(as.vector(unlist(abs_pre[,x]))),method="spearman"))[c(2,3)])
+cor_gene_abs=data.frame(t(cor_gene_abs))
+cor_gene_abs$estimate.rho=as.numeric(as.vector(unlist(cor_gene_abs$estimate.rho)))
+mean(cor_gene_abs$estimate.rho)#0.2458
+rownames(cor_gene_abs)=colnames(essentiality)
+colnames(cor_gene_abs)=c("P_value","Spearman.Correlation")
+
+library(ggplot2)
+p1<-ggplot(cor_gene_abs, aes(x=Spearman.Correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Top10 absolute co-exp-ess correlated expression feature line regression")+scale_x_continuous( limits=c(-0.3, 0.75))
+
+#load in the PR genes and look at the performance
+pr_genes=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/RP_genes_bioDBnet_symbol_to_id_manually_add.txt",header=T,sep="\t")
+length(intersect(pr_genes$Homolog...Human.Gene.ID,rownames(cor_gene_abs)))
+pr_gene_depmap=intersect(pr_genes$Homolog...Human.Gene.ID,rownames(cor_gene_abs))
+#PRgene 2647 and 2055 can find in the cor_gene_abs.
+cor_prgene_top10_model=cor_gene_abs[match(pr_gene_depmap,rownames(cor_gene_abs)),]
+mean(cor_prgene_top10_model$estimate.rho)#0.259
+
+#load in the paper performance.
+pr_performance=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_for_each_gene_Dream_data/paper_PRgenes_performance.txt",header = T,sep="\t")
+pr_performance=pr_performance[match(pr_genes$Gene.Symbol[match(pr_gene_depmap,pr_genes$Homolog...Human.Gene.ID)],pr_performance$Genes),]
+mean(pr_performance$Spearman.Correlation)#0.18
+
+p2<-ggplot(pr_performance, aes(x=Spearman.Correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("PRgenes SVM model spearman correlated distribution")+scale_x_continuous( limits=c(-0.3, 0.75))
+
+
+#try to plot three figure into one panel
+library(ggpubr)
+ggarrange(p1,p2,nrow = 2, 
+          labels = c("A","B"))#this just put three figure together
+ggsave("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/PRgene_performance_compare_SVM_linear.pdf",height = 5)
+```
+
+
+
+
+
+```{r}
+#test the performance of top15 absolute cor-exp-ess gene expression feature
+test_predict <- readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top15_abs_linear/Abs_cor_top15_linear_model_test_predict.rds")
+dim(test_predict)
+
+cor_gene_posi=apply(matrix(1:16371),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(essentiality[386:551,x]))),as.numeric(as.vector(unlist(test_predict[,x])))))[c(3,4)])
+
+
+cor_gene_posi=data.frame(t(cor_gene_posi))
+cor_gene_posi$estimate.cor=as.numeric(as.vector(unlist(cor_gene_posi$estimate.cor)))
+mean(cor_gene_posi$estimate.cor,na.rm = T) #0.23312
+saveRDS(cor_gene_posi,"/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top15_abs_linear/Abs_cor_top15_linear_model_test_predict_gene_cor.rds")
+
+library(ggplot2)
+p<-ggplot(cor_gene_posi, aes(x=estimate.cor)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Absolute Co-exp-ess 15 features line regression correlation distribution")
+ggsave("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top15_abs_linear/linear_model_test_predict_cor.pdf",height =3 )
+
+
+setwd("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_selection_linear_model/Co_exp_ess_Line_regression/Co_exp_ess_Abs_top15/")
+library(xgboost)
+negative_model=readRDS("pAbs_cor_top15_linear_model.rds")
+length(negative_model)
+feature_name=negative_model[[1]][["feature_names"]]
+#gene_name=readRDS("Feature_matrix_gene_order.rds")
+#instead of each feature have been using into build model in the xgboost linear-regression model
+
+extract_feature_importance<-function(x){
+  feature_gain=xgb.importance( model = x)
+  index=match(feature_name,feature_gain$Feature)
+  return(as.vector(unlist(feature_gain$Gain[index])))
+}
+negative_result=matrix(unlist(lapply(negative_model,extract_feature_importance)),ncol=15,byrow=T)
+colnames(negative_result)=feature_name
+saveRDS(negative_result,file="Xgboost_Linear_feature_Gain_top15_Co_exp-ess.rds")
+
+#Now we look at the feature contribution.
+feature_contribution=negative_result
+feature_contribution[which(is.na(feature_contribution))]=0
+feature_contribution[1:5,1:5]+1
+dim(feature_contribution)
+max(feature_contribution)
+data=data.frame(Feature_contribution=as.vector(feature_contribution),Feature_name=rep(colnames(feature_contribution),each=16371))
+
+library(ggplot2)
+p2<-ggplot(data, aes(x=Feature_name,y=Feature_contribution)) + 
+  geom_boxplot(color="black", fill="white",outlier.size = 0.8)+ggtitle("Feature contribution in Co-exp feature list")+theme(axis.text.x = element_text(angle=90))+scale_y_continuous( limits=c(0, 0.5))+scale_x_discrete(limits=colnames(feature_contribution))
+ggsave("Top15_Feature_contribution_co_exp.pdf",height = 6,width = 9)
+```
+
+
+
+
+```{r}
+#test the performance of top20 absolute cor-exp-ess gene expression feature
+test_predict <- readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top20_abs_linear/Abs_cor_top20_linear_model_test_predict.rds")
+dim(test_predict)
+
+cor_gene_posi=apply(matrix(1:16371),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(essentiality[386:551,x]))),as.numeric(as.vector(unlist(test_predict[,x])))))[c(3,4)])
+
+
+cor_gene_posi=data.frame(t(cor_gene_posi))
+cor_gene_posi$estimate.cor=as.numeric(as.vector(unlist(cor_gene_posi$estimate.cor)))
+mean(cor_gene_posi$estimate.cor,na.rm = T) #0.2318
+saveRDS(cor_gene_posi,"/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top20_abs_linear/Abs_cor_top20_linear_model_test_predict_gene_cor.rds")
+
+library(ggplot2)
+p<-ggplot(cor_gene_posi, aes(x=estimate.cor)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Absolute Co-exp-ess 20 features line regression correlation distribution")
+ggsave("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top20_abs_linear/linear_model_test_predict_cor.pdf",height =3 )
+
+
+setwd("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_selection_linear_model/Co_exp_ess_Line_regression/Co_exp_ess_Abs_top20/")
+library(xgboost)
+negative_model=readRDS("pAbs_cor_top20_linear_model.rds")
+length(negative_model)
+feature_name=negative_model[[1]][["feature_names"]]
+#gene_name=readRDS("Feature_matrix_gene_order.rds")
+#instead of each feature have been using into build model in the xgboost linear-regression model
+
+extract_feature_importance<-function(x){
+  feature_gain=xgb.importance( model = x)
+  index=match(feature_name,feature_gain$Feature)
+  return(as.vector(unlist(feature_gain$Gain[index])))
+}
+negative_result=matrix(unlist(lapply(negative_model,extract_feature_importance)),ncol=20,byrow=T)
+colnames(negative_result)=feature_name
+saveRDS(negative_result,file="Xgboost_Linear_feature_Gain_top20_Co_exp-ess.rds")
+
+#Now we look at the feature contribution.
+feature_contribution=negative_result
+feature_contribution[which(is.na(feature_contribution))]=0
+feature_contribution[1:5,1:5]+1
+dim(feature_contribution)
+max(feature_contribution)
+data=data.frame(Feature_contribution=as.vector(feature_contribution),Feature_name=rep(colnames(feature_contribution),each=16371))
+
+library(ggplot2)
+p2<-ggplot(data, aes(x=Feature_name,y=Feature_contribution)) + 
+  geom_boxplot(color="black", fill="white",outlier.size = 0.8)+ggtitle("Feature contribution in Co-exp feature list")+theme(axis.text.x = element_text(angle=90))+scale_y_continuous( limits=c(0, 0.5))+scale_x_discrete(limits=colnames(feature_contribution))
+ggsave("Top20_Feature_contribution_co_exp.pdf",height = 6,width = 12)
+```
+
+
+
+```{r}
+#test the performance of top5 absolute cor-exp-ess gene expression feature
+test_predict <- readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top5_abs_linear/top5_Abs_co_exp_ess_linear_model_test_predict.rds")
+dim(test_predict)
+
+cor_gene_posi=apply(matrix(1:16371),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(essentiality[386:551,x]))),as.numeric(as.vector(unlist(test_predict[,x])))))[c(3,4)])
+
+
+cor_gene_posi=data.frame(t(cor_gene_posi))
+cor_gene_posi$estimate.cor=as.numeric(as.vector(unlist(cor_gene_posi$estimate.cor)))
+mean(cor_gene_posi$estimate.cor,na.rm = T) #0.222
+saveRDS(cor_gene_posi,"/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top5_abs_linear/top5_Abs_co_exp_ess_linear_model_test_predict_gene_cor.rds")
+```
+
+
