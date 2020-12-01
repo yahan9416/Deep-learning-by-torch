@@ -1,0 +1,261 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r}
+#because the input feature expression and copy number data both are unprocess data
+#essential data is normalized in the 0-1.
+#The first thing is generate the feature matirx 
+#we could find the test cell line and train cell line by the performance in test cell line.
+feature_all_gene=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/PR_genes_10_features.txt",header=T,sep="\t")
+pr_genes=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/paper_PRgenes_performance.txt",header=T,sep="\t")
+pr_genes=as.vector(unlist(pr_genes$Genes))
+feature_pr=subset(feature_all_gene,PR.gene %in% pr_genes$Genes)
+feature_pr=as.matrix(feature_pr)
+test_cellline=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/supplyment_file/bty467_supplementary_table_s2.txt",header = T,sep="\t")
+
+
+expression=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/CCLE_expression_training_phase3.gct",header=F,sep="\t")
+colnames(expression)=as.vector(unlist(expression[1,]))
+#due to the gene are duplicated, so we need to remove the duplicated gene and set rowname.
+index=which(duplicated(as.vector(unlist(expression[,2]))))
+expression=expression[-1*index,]
+rownames(expression)=as.vector(unlist(expression[,2]))
+expression=expression[-1,-1*c(1,2)]
+expression=t(expression)
+copy_number=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/CCLE_copynumber_training_phase3.gct",header=F,sep="\t")
+colnames(copy_number)=as.vector(unlist(copy_number[1,]))
+rownames(copy_number)=as.vector(unlist(copy_number[,2]))
+copy_number=copy_number[-1,-1*c(1,2)]
+copy_number=t(copy_number)
+essentiality=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/Achilles_v2.11_training_phase3.gct",header=F,sep="\t")
+colnames(essentiality)=as.vector(unlist(essentiality[1,]))
+rownames(essentiality)=as.vector(unlist(essentiality[,2]))
+essentiality=essentiality[-1,-1*c(1,2)]
+
+index=match(pr_genes,rownames(essentiality))
+as.vector(unlist(pr_genes))[which(is.na(index))]
+
+index_row=match(c("SEPT5","MAR3","SEPT6","SEPT7","SEPT2","SEPT9"),rownames(essentiality))
+rownames(essentiality)[index_row]=as.vector(unlist(pr_genes))[which(is.na(index))]
+index=match(as.vector(unlist(pr_genes)),rownames(essentiality))
+essentiality=essentiality[index,]
+dim(essentiality)
+ess_gene=rownames(essentiality)
+ess_cell_line=colnames(essentiality)
+essentiality=matrix(as.numeric(as.vector(unlist(essentiality))),ncol=105,byrow=F)
+rownames(essentiality)=ess_gene
+colnames(essentiality)=ess_cell_line
+#now we need to normalized the dataset.
+nor_ess=t(apply(essentiality,1,function(x) (x-min(x))/(max(x)-min(x))))
+rownames(nor_ess)=ess_gene
+colnames(nor_ess)=ess_cell_line
+nor_ess=t(nor_ess)
+saveRDS(nor_ess,file="/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/Achilles_v2.11_training_phase3_after_norm.rds")
+
+#we need to process the order of cell line in all three datasets
+#we have test the order ,find the order are same in three datasets.
+cell_line_order=intersect(rownames(expression),intersect(rownames(copy_number),rownames(nor_ess)))
+index=match(cell_line_order,rownames(expression))
+index=match(cell_line_order,rownames(copy_number))
+index=match(cell_line_order,rownames(nor_ess))
+
+
+#each line represent one gene all feature and essential score(after normalized)
+#each row first column is the gene name and second column is the cell line name.
+feature_matrix<-NULL
+generate_input_feature<-function(x){
+  #this means the 10th feature is the copy number varitaion.
+ if(x[1] == x[11]){
+   index_exp=match(x[2:10],colnames(expression))
+   index_cnv=match(x[11],colnames(copy_number))
+   index_ess=match(x[1],colnames(nor_ess))
+   temp_train=cbind(x[1],rownames(expression),expression[,index_exp],copy_number[,index_cnv],nor_ess[,index_ess])
+   }else{#rather than all 10 feature both are expression.
+   index=match(x[2:11],colnames(expression))
+   index_ess=match(x[1],colnames(nor_ess))
+   temp_train=cbind(x[1],colnames(expression),expression[,index],nor_ess[,index_ess])}
+  colnames(temp_train)<-c("Gene_symbol","Cell_line","Feat1","Feat2","Feat3","Feat4","Feat5","Feat6","Feat7","Feat8","Feat9","Feat10","Essentiality")
+  feature_matrix<<-rbind(feature_matrix,temp_train)
+  return(temp_train)
+}
+result=apply(feature_pr,1,generate_input_feature)
+saveRDS(feature_matrix,file="/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/Train_SVM_model_feature_matrix.rds")
+
+```
+
+
+
+```{r}
+#This partition is ussed to process the test datasets.
+
+expression=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/CCLE_expression_finaltest_phase3.gct",header=F,sep="\t")
+colnames(expression)=as.vector(unlist(expression[1,]))
+#due to the gene are duplicated, so we need to remove the duplicated gene and set rowname.
+index=which(duplicated(as.vector(unlist(expression[,2]))))
+expression=expression[-1*index,]
+rownames(expression)=as.vector(unlist(expression[,2]))
+expression=expression[-1,-1*c(1,2)]
+expression=t(expression)
+copy_number=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/CCLE_copynumber_finaltest_phase3.gct",header=F,sep="\t")
+colnames(copy_number)=as.vector(unlist(copy_number[1,]))
+rownames(copy_number)=as.vector(unlist(copy_number[,2]))
+copy_number=copy_number[-1,-1*c(1,2)]
+copy_number=t(copy_number)
+essentiality=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/Achilles_v2.11_finaltest_phase3.gct",header=F,sep="\t")
+colnames(essentiality)=as.vector(unlist(essentiality[1,]))
+rownames(essentiality)=as.vector(unlist(essentiality[,2]))
+essentiality=essentiality[-1,-1*c(1,2)]
+
+index=match(pr_genes,rownames(essentiality))
+as.vector(unlist(pr_genes))[which(is.na(index))]
+
+index_row=match(c("SEPT5","MAR3","SEPT6","SEPT7","SEPT2","SEPT9"),rownames(essentiality))
+rownames(essentiality)[index_row]=as.vector(unlist(pr_genes))[which(is.na(index))]
+index=match(as.vector(unlist(pr_genes)),rownames(essentiality))
+essentiality=essentiality[index,]
+dim(essentiality)
+ess_gene=rownames(essentiality)
+ess_cell_line=colnames(essentiality)
+essentiality=matrix(as.numeric(as.vector(unlist(essentiality))),ncol=44,byrow=F)
+rownames(essentiality)=ess_gene
+colnames(essentiality)=ess_cell_line
+#now we need to normalized the dataset.
+nor_ess=t(apply(essentiality,1,function(x) (x-min(x))/(max(x)-min(x))))
+rownames(nor_ess)=ess_gene
+colnames(nor_ess)=ess_cell_line
+nor_ess=t(nor_ess)
+saveRDS(nor_ess,file="/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/Achilles_v2.11_test_phase3_after_norm.rds")
+
+#we need to process the order of cell line in all three datasets
+#we have test the order ,find the order are same in three datasets.
+cell_line_order=intersect(rownames(expression),intersect(rownames(copy_number),rownames(nor_ess)))
+match(cell_line_order,rownames(expression))
+match(cell_line_order,rownames(copy_number))
+match(cell_line_order,rownames(nor_ess))
+
+
+#each line represent one gene all feature and essential score(after normalized)
+#each row first column is the gene name and second column is the cell line name.
+feature_matrix<-NULL
+generate_input_feature<-function(x){
+  #this means the 10th feature is the copy number varitaion.
+ if(x[1] == x[11]){
+   index_exp=match(x[2:10],colnames(expression))
+   index_cnv=match(x[11],colnames(copy_number))
+   index_ess=match(x[1],colnames(nor_ess))
+   temp_train=cbind(x[1],rownames(expression),expression[,index_exp],copy_number[,index_cnv],nor_ess[,index_ess])
+   }else{#rather than all 10 feature both are expression.
+   index=match(x[2:11],colnames(expression))
+   index_ess=match(x[1],colnames(nor_ess))
+   temp_train=cbind(x[1],colnames(expression),expression[,index],nor_ess[,index_ess])}
+  colnames(temp_train)<-c("Gene_symbol","Cell_line","Feat1","Feat2","Feat3","Feat4","Feat5","Feat6","Feat7","Feat8","Feat9","Feat10","Essentiality")
+  feature_matrix<<-rbind(feature_matrix,temp_train)
+  return(temp_train)
+}
+result=apply(feature_pr,1,generate_input_feature)
+saveRDS(feature_matrix,file="/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/Test_SVM_model_feature_matrix.rds")
+
+```
+
+
+
+```{r}
+#For each gene build a svm model.
+library(e1071)
+model<<-NULL
+correaltion_coeff<-NULL
+feature_matrix=readRDS("/dev_obs/hanya/predict_essentiality/PR_gene_method/Train_SVM_model_feature_matrix.rds")
+test_dataset=readRDS("/dev_obs/hanya/predict_essentiality/PR_gene_method/Test_SVM_model_feature_matrix.rds")
+generate_SVM_model_for_each_gene<-function(x){
+  index=which(feature_matrix[,1] == x)
+  temp_feature_mat=feature_matrix[index,3:13]
+  col_tem=colnames(temp_feature_mat)
+  temp_feature_mat=matrix(as.numeric(as.vector(unlist(temp_feature_mat))),ncol=11,byrow=F)
+  temp_feature_mat=data.frame(temp_feature_mat)
+  colnames(temp_feature_mat)=col_tem
+  
+  index_test=which(test_dataset[,1] == x)
+  temp_test_fea=test_dataset[index_test,3:12]
+  temp_test_fea=data.frame(matrix(as.numeric(as.vector(unlist(temp_test_fea))),ncol=10,byrow = F))
+  colnames(temp_test_fea)=col_tem[-11]
+  temp_test_essential=as.numeric(as.vector(unlist(test_dataset[index_test,13])))
+  
+  #for each gene is do 5 round 5-cross validation. so for each gene we need to build 25
+  round_5_cross_5<-function(y){
+  set.seed(y)
+  index=sample(1:105)
+  temp_feature_mat=temp_feature_mat[index,]
+  model_one_gene_1=svm(Essentiality~.,data=temp_feature_mat[-1*(1:21),],type="eps-regression")
+  pred_essential<-predict(model_one_gene_1,temp_test_fea)
+  cor_coeff<-cor.test(pred_essential,temp_test_essential,method="spearman")
+  correaltion_coeff<<-rbind(correaltion_coeff,c(x,cor_coeff$estimate,cor_coeff$p.value))
+  model_one_gene_2=svm(Essentiality~.,data=temp_feature_mat[-1*(22:42),],type="eps-regression")
+  pred_essential<-predict(model_one_gene_2,temp_test_fea)
+  cor_coeff<-cor.test(pred_essential,temp_test_essential,method="spearman")
+  correaltion_coeff<<-rbind(correaltion_coeff,c(x,cor_coeff$estimate,cor_coeff$p.value))
+  model_one_gene_3=svm(Essentiality~.,data=temp_feature_mat[-1*(43:63),],type="eps-regression")
+  pred_essential<-predict(model_one_gene_3,temp_test_fea)
+  cor_coeff<-cor.test(pred_essential,temp_test_essential,method="spearman")
+  correaltion_coeff<<-rbind(correaltion_coeff,c(x,cor_coeff$estimate,cor_coeff$p.value))
+  model_one_gene_4=svm(Essentiality~.,data=temp_feature_mat[-1*(64:84),],type="eps-regression")
+  pred_essential<-predict(model_one_gene_4,temp_test_fea)
+  cor_coeff<-cor.test(pred_essential,temp_test_essential,method="spearman")
+  correaltion_coeff<<-rbind(correaltion_coeff,c(x,cor_coeff$estimate,cor_coeff$p.value))
+  model_one_gene_5=svm(Essentiality~.,data=temp_feature_mat[-1*(85:105),],type="eps-regression")
+  pred_essential<-predict(model_one_gene_5,temp_test_fea)
+  cor_coeff<-cor.test(pred_essential,temp_test_essential,method="spearman")
+  correaltion_coeff<<-rbind(correaltion_coeff,c(x,cor_coeff$estimate,cor_coeff$p.value))
+  model<<-c(model,model_one_gene_1,model_one_gene_2,model_one_gene_3,model_one_gene_4,model_one_gene_5)
+  }
+  result=apply(matrix(1:5),1,round_5_cross_5)
+  
+}
+pr_genes=matrix(unique(as.vector(unlist(feature_matrix[,1]))))
+result=apply(matrix(pr_genes[1:3,]),1,generate_SVM_model_for_each_gene)
+
+saveRDS(correaltion_coeff,file="/dev_obs/hanya/predict_essentiality/PR_gene_method/PRgenes_SVM_model_test_dataset_correlation.rds")
+saveRDS(model,file="/dev_obs/hanya/predict_essentiality/PR_gene_method/PRgenes_SVM_model_list.rds")
+
+```
+
+
+
+
+
+```{r}
+correlation_1 <- readRDS("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/PRgenes_SVM_model_test_dataset_correlation_1.rds")
+correlation_2 <- readRDS("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/PRgenes_SVM_model_test_dataset_correlation_2.rds")
+correlation_3 <- readRDS("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/PRgenes_SVM_model_test_dataset_correlation_3.rds")
+correlation=rbind(correlation_1,correlation_2,correlation_3)
+colnames(correlation)=c("Gene","Correlation","P_value")
+correlation=data.frame(correlation)
+correlation$Correlation=as.numeric(as.vector(unlist(correlation$Correlation)))
+ag <- aggregate(Correlation ~ Gene, data = correlation, mean)
+
+library(ggplot2)
+ggplot(ag, aes(x=Correlation)) + 
+  geom_histogram(color="black", fill="white")
+ggsave("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/PRgenes_SVM_model_test_dataset_correlation_distribution.pdf")
+```
+
+
+
+
+```{r}
+#download the test cell line
+library(synapser)
+synLogin(email="yahanhy94@gmail.com",password="15202603215hy")
+
+exp_cor_test=synGet("syn2660061", downloadLocation="/Users/yahan/Desktop/Predict_essen tial_score")
+copy_number_test=synGet("syn2660060", downloadLocation="/Users/yahan/Desktop/Predict_essential_score")
+essen_test=synGet("syn2660068", downloadLocation="/Users/yahan/Desktop/Predict_essential_score")
+
+exp=synGet("syn2660055", downloadLocation="/Users/yahan/Desktop/Predict_essential_score")
+copy_number=synGet("syn2660051", downloadLocation="/Users/yahan/Desktop/Predict_essential_score")
+essen=synGet("syn2660049", downloadLocation="/Users/yahan/Desktop/Predict_essential_score")
+
+PRgene=synGet("syn2660067", downloadLocation="/Users/yahan/Desktop/Predict_essential_score")
+```
+

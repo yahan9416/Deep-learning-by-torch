@@ -1,0 +1,183 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+
+
+```{r}
+#generate feature matirx to bulid the SVM model in DepMap dataset, and using svm to build model.
+
+#because the input feature expression and copy number data both are unprocess data
+#essential data is normalized in the 0-1.
+#The first thing is generate the feature matirx 
+
+feature_all_gene=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/PR_genes_10_features.txt",header=T,sep="\t")
+pr_genes=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/RP_genes_bioDBnet_symbol_to_id_manually_add.txt",header=T,sep="\t")
+expression=readRDS("/Users/yahan/Desktop/Predict_essential_score/last_time_updata_depmap_data/CCLE_depMap_19Q1_TPM_correct_colnames_and_columne_number.rds")
+copy_number=readRDS("/Users/yahan/Desktop/Predict_essential_score/last_time_updata_depmap_data/public_19Q1_gene_cn.rds")
+load("/Users/yahan/Desktop/Predict_essential_score/last_time_updata_depmap_data/gene_effect_corrected.RData")#ccle_crispr
+cell_line_order=readRDS("/Users/yahan/Desktop/Predict_essential_score/Cluster_gene_based_essentiality/cell_line_order.rds")
+index_1=match(cell_line_order[,1],rownames(expression))
+index_2=match(cell_line_order[,1],rownames(copy_number))
+index_3=match(cell_line_order[,1],rownames(ccle_crispr))
+expression=expression[index_1,]
+index_na_col=which(is.na(colnames(expression)))
+expression=expression[,-1*index_na_col]
+expression=as.matrix(expression)
+copy_number=copy_number[index_2,]
+copy_number=as.matrix(copy_number)
+ccle_crispr=ccle_crispr[index_3,]
+#the normalization of essentiality is across cell line. For each gene sperately normalized in train cell lines or test cell lines.
+#totally, we have 388 train cell lines and 216 test cell lines.
+ccle_crispr_gene=colnames(ccle_crispr)
+ccle_crispr=matrix(as.numeric(as.vector(unlist(ccle_crispr))),ncol=17634,byrow=F)
+colnames(ccle_crispr)=ccle_crispr_gene
+rownames(ccle_crispr)=cell_line_order[,1]
+nor_ess=apply(ccle_crispr,2,function(x) (x-min(x))/(max(x)-min(x)))
+colnames(nor_ess)=ccle_crispr_gene
+rownames(nor_ess)=cell_line_order[,1]
+
+index=which(!is.na(match(pr_genes$Homolog...Human.Gene.ID,colnames(ccle_crispr))))#对于2647个基因而言有2393个基因是有crispr-screen score.
+
+feature_pr=subset(feature_all_gene,PR.gene %in% pr_genes$Gene.Symbol[index])
+feature_pr=as.matrix(feature_pr)
+
+feature_gene=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/PR2647_unique_features_gene_name.txt",header=T,sep="\t")
+feature_gene=feature_gene[-1*(which(is.na(feature_gene[,2]))),]
+#now we count the number of feature for each PR gene and then select the gene with enough feature to build model and test in the Dream-challenge_model.
+
+count_number_feature<-function(x){
+  #the first things is transmit the symbol into gene id.
+  model_gene=x[1]
+ if(x[1] == x[11]){
+   x=as.vector(unlist(feature_gene$Human.Gene.ID[match(x,feature_gene$Gene.Symbol)]))
+   index_exp=match(x[2:10],colnames(expression))
+   index_cnv=match(x[11],colnames(copy_number))
+   num=length(which(!is.na(c(index_cnv,index_exp))))
+   return(c(model_gene,num))
+   }else{#rather than all 10 feature both are expression.
+  x=as.vector(unlist(feature_gene$Human.Gene.ID[match(x,feature_gene$Gene.Symbol)]))
+   index=match(x[2:11],colnames(expression))
+   num=length(which(!is.na(index)))
+   return(c(model_gene,num))
+   }
+}
+result=apply(feature_pr,1,count_number_feature)
+result=t(result)
+table(result[,2])#total 2393 gene.
+# 10    5    6    7    8    9 
+# 1251    2   14   65  266  795 
+gene_more_8_feat=result[which(as.numeric(result[,2])>=8),1]#2313
+feature_pr=as.data.frame(feature_pr)
+feature_pr=subset(feature_pr,PR.gene %in% as.vector(unlist(gene_more_8_feat)))
+
+#now we try to build the model
+train_feature_matrix<-NULL
+test_feature_matrix<-NULL
+generate_input_feature<-function(x){
+  #this means the 10th feature is the copy number varitaion.
+  model_gene=x[1]
+  print(model_gene)
+ if(x[1] == x[11]){
+   x=as.vector(unlist(feature_gene$Human.Gene.ID[match(as.vector(unlist(x)),feature_gene$Gene.Symbol)]))
+   index_exp=match(x[2:10],colnames(expression))
+   index_cnv=match(x[11],colnames(copy_number))
+   index_ess=match(x[1],colnames(nor_ess))
+   temp_train=cbind(model_gene,rownames(expression),expression[,index_exp],copy_number[,index_cnv],nor_ess[,index_ess])
+   }else{#rather than all 10 feature both are expression.
+  x=as.vector(unlist(feature_gene$Human.Gene.ID[match(as.vector(unlist(x)),feature_gene$Gene.Symbol)]))
+   index=match(x[2:11],colnames(expression))
+   index_ess=match(x[1],colnames(nor_ess))
+   temp_train=cbind(model_gene,colnames(expression),expression[,index],nor_ess[,index_ess])}
+  colnames(temp_train)<-c("Gene_symbol","Cell_line","Feat1","Feat2","Feat3","Feat4","Feat5","Feat6","Feat7","Feat8","Feat9","Feat10","Essentiality")
+  train_feature_matrix<<-rbind(train_feature_matrix,temp_train[1:388,])
+  test_feature_matrix<<-rbind(test_feature_matrix,temp_train[389:554,])
+  return(temp_train)
+}
+result=apply(as.matrix(feature_pr),1,generate_input_feature)
+#there must be NA,so we need to process the NA into 0.
+index=which(is.na(test_feature_matrix))
+test_feature_matrix[index]=0
+
+index=which(is.na(train_feature_matrix))
+train_feature_matrix[index]=0
+#some gene which essential score are always 0.
+train_feature_matrix=as.data.frame(train_feature_matrix)
+train_feature_matrix$Essentiality=as.numeric(as.vector(unlist(train_feature_matrix$Essentiality)))
+essential_score=aggregate(Essentiality ~ Gene_symbol, data = train_feature_matrix, sum)
+essential_score_gene_sym=as.vector(unlist(essential_score$Gene_symbol[which(essential_score$Essentiality>0)])) #2292
+train_feature_matrix=subset(train_feature_matrix,Gene_symbol %in% essential_score_gene_sym)
+saveRDS(train_feature_matrix,file="/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/Train_SVM_model_feature_matrix.rds")
+
+test_feature_matrix=as.data.frame(test_feature_matrix)
+test_feature_matrix=subset(test_feature_matrix,Gene_symbol %in% essential_score_gene_sym)
+saveRDS(test_feature_matrix,file="/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/Test_SVM_model_feature_matrix.rds")
+```
+
+
+
+
+
+```{r}
+#after build model and test the performance in the test datasets.
+
+#Model train in the Dream challenge dataset.
+Drean_model_in_DepMap_data <- readRDS("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_for_each_gene_Dream_data/The_performance_Drean_model_in_DepMap_data.rds")
+colnames(Drean_model_in_DepMap_data)=c("Gene","Correlation","P_value")
+Drean_model_in_DepMap_data=data.frame(Drean_model_in_DepMap_data)
+Drean_model_in_DepMap_data$Correlation=as.numeric(as.vector(unlist(Drean_model_in_DepMap_data$Correlation)))
+ag <- aggregate(Correlation ~ Gene, data = Drean_model_in_DepMap_data, mean)
+mean(ag$Correlation)
+
+library(ggplot2)
+ggplot(ag, aes(x=Correlation)) + 
+  geom_histogram(color="black", fill="white")
+ggsave("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_for_each_gene_Dream_data/Drean_model_performance_DepMap_distribution.pdf")
+
+
+#DepMap new model same feature, the performance.
+DepMap_model_perform <- readRDS("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/PRgenes_SVM_model_test_dataset_correlation.rds")
+colnames(DepMap_model_perform)=c("Gene","Correlation","P_value")
+DepMap_model_perform=data.frame(DepMap_model_perform)
+DepMap_model_perform$Correlation=as.numeric(as.vector(unlist(DepMap_model_perform$Correlation)))
+ag <- aggregate(Correlation ~ Gene, data = DepMap_model_perform, mean)
+mean(ag$Correlation) #0.0455
+library(ggplot2)
+ggplot(ag, aes(x=Correlation)) + 
+  geom_histogram(color="black", fill="white")
+ggsave("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/DepMap_model_performance_DepMap_distribution.pdf")
+
+```
+
+
+
+```{r}
+ccle_crispr=as.matrix(read.csv("/Users/yahan/Desktop/Predict_essential_score/last_time_updata_depmap_data/gene_effect_corrected.csv",header=T))
+
+cell_line=ccle_crispr[,1]
+ccle_crispr=ccle_crispr[,-1]
+rownames(ccle_crispr)=cell_line
+
+copy_gene=colnames(ccle_crispr)
+copy_gene=unlist(lapply(strsplit(copy_gene,"\\."),function(x) x[1]))
+colnames(ccle_crispr)=copy_gene
+
+ccle_crispr=matrix(as.numeric(ccle_crispr),byrow=F,ncol=17634)
+rownames(ccle_crispr)=cell_line
+colnames(ccle_crispr)=copy_gene
+saveRDS(ccle_crispr,"/Users/yahan/Desktop/Predict_essential_score/last_time_updata_depmap_data/gene_effect_corrected_symbol.rds")
+```
+
+
+```{r}
+feature_gene=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/PR2647_genes_feature_gene_symbol_bioDBnet.txt",header=T,sep="\t")
+library(clusterProfiler)
+library(org.Hs.eg.db)
+feature_gene_id=bitr(feature_gene[,1],fromType = "SYMBOL",toType = "ENTREZID",OrgDb = "org.Hs.eg.db")
+feature_gene$bitr_geneid=""
+feature_gene$bitr_geneid[match(feature_gene_id$SYMBOL,feature_gene[,1])]=feature_gene_id$ENTREZID
+write.table(feature_gene,"/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/PR2647_unique_features_gene_name.txt",quote = F,sep="\t",col.names = T,row.names = F)
+
+```
+

@@ -1,0 +1,161 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+
+```{r}
+#need to process CNV.
+sanger_cnv=read.table("/Users/yahan/Downloads/cnv_20191101/cnv_gistic_20191101.csv",header=T,sep=",")
+gene_list=read.table("/Users/yahan/Desktop/Predict_essential_score/Sanger_institute_data_Valid/gene_identifiers_latest.csv",header=T,sep=",",fill=T,quote="")
+sanger_cnv=sanger_cnv[c(-1,-2),-1]
+rownames(sanger_cnv)=sanger_cnv[,1]
+sanger_cnv=sanger_cnv[,-1]
+
+cell_index=match(colnames(sanger_cnv),rownames(sanger_exp))
+sanger_copy_gene_id=gene_list$entrez_id[match(rownames(sanger_cnv),gene_list$hgnc_symbol)]
+index=c(which(duplicated(sanger_copy_gene_id)),which(is.na(sanger_copy_gene_id)))
+sanger_cnv=sanger_cnv[-1*index,]
+sanger_copy_gene_id=sanger_copy_gene_id[-1*index]
+rownames(sanger_cnv)=sanger_copy_gene_id
+sanger_cnv=t(sanger_cnv)
+cnv_cell_line=rownames(sanger_cnv)
+sanger_cnv=matrix(as.numeric(as.vector(unlist(sanger_cnv))),ncol=20659,byrow=F)
+colnames(sanger_cnv)=sanger_copy_gene_id
+rownames(sanger_cnv)=cnv_cell_line
+saveRDS(sanger_cnv,file="/Users/yahan/Desktop/Predict_essential_score/Sanger_institute_data_Valid/Sanger_cnv_qistic_value.rds")
+```
+
+
+```{r}
+#test the DepMap model performance on Sanger dataset.
+feature_list=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/SVM_model_reselect_feature_build_model/RPgenes_top10_exp_feature_gene.txt",header = T,sep="\t",quote="")
+
+sanger_exp=readRDS("/Users/yahan/Desktop/Predict_essential_score/Sanger_institute_data_Valid/Sanger_RNASeq_TPM.rds")
+sanger_cnv=readRDS("/Users/yahan/Desktop/Predict_essential_score/Sanger_institute_data_Valid/Sanger_cnv_qistic_value.rds")
+sanger_ess=readRDS("/Users/yahan/Desktop/Predict_essential_score/Sanger_institute_data_Valid/Sanger_13184gene_test_linear_model_performance/process_crispr_test_linear_model.rds")
+ess_gene_id=colnames(sanger_ess)
+ess_cell_line=rownames(sanger_ess)
+sanger_ess=matrix(as.numeric(as.vector(unlist(sanger_ess))),ncol=12710,byrow=F)
+nor_ess=apply(sanger_ess,2,function(x) (x-min(x))/(max(x)-min(x)))
+colnames(nor_ess)=ess_gene_id
+rownames(nor_ess)=ess_cell_line
+cell_line=intersect(intersect(rownames(nor_ess),rownames(sanger_exp)),rownames(sanger_cnv))
+
+nor_ess=nor_ess[match(cell_line,rownames(nor_ess)),]
+sanger_exp=sanger_exp[match(cell_line,rownames(sanger_exp)),]
+sanger_cnv=sanger_cnv[match(cell_line,rownames(sanger_cnv)),]
+
+
+train_feature_matrix<-NULL
+generate_input_feature<-function(x){
+  #this means the 10th feature is the copy number varitaion.
+  model_gene=x
+  print(model_gene)
+ if(length(which(colnames(sanger_cnv) == x)) > 0){
+   x=as.vector(unlist(feature_list[match(x,rownames(feature_list)),]))
+   index_exp=match(x[1:9],colnames(sanger_exp))
+   index_cnv=match(model_gene,colnames(sanger_cnv))[1]
+   index_ess=match(model_gene,colnames(nor_ess))
+   temp_train=cbind(model_gene,rownames(sanger_exp),sanger_exp[,index_exp],sanger_cnv[,index_cnv],nor_ess[,index_ess])
+   }else{#rather than all 10 feature both are expression.
+    x=as.vector(unlist(feature_list[match(x,rownames(feature_list)),]))
+    index_exp=match(x[1:10],colnames(sanger_exp))
+    index_ess=match(model_gene,colnames(nor_ess))
+    temp_train=cbind(model_gene,rownames(sanger_exp),sanger_exp[,index_exp],nor_ess[,index_ess])}
+  colnames(temp_train)<-c("Gene_symbol","Cell_line","Feat1","Feat2","Feat3","Feat4","Feat5","Feat6","Feat7","Feat8","Feat9","Feat10","Essentiality")
+  train_feature_matrix<<-rbind(train_feature_matrix,temp_train)
+  return(temp_train)
+}
+pr_gene=intersect(rownames(feature_list),colnames(sanger_ess))
+result=apply(matrix(pr_gene),1,generate_input_feature)
+
+saveRDS(train_feature_matrix,file="/Users/yahan/Desktop/Predict_essential_score/Sanger_institute_data_Valid/Sanger_RPgenes_test_performance_DepMap_datset.rds")
+saveRDS(pr_gene,file="/Users/yahan/Desktop/Predict_essential_score/Sanger_institute_data_Valid/Sanger_RPgenes_Sanger_DepMap_datset.rds")
+```
+
+
+
+
+```{r}
+library(e1071)
+
+Sanger_test=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Sanger_institute_data_to_Valid/Test_SVM_model_in_Sanger/Sanger_RPgenes_test_performance_DepMap_datset.rds")
+setwd("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/SVM_model_reselect_feature_build_model/Model_list/")
+Sanger_test=as.data.frame(Sanger_test)
+
+predict_ess<<-NULL
+actual_ess<<-NULL
+correaltion_coeff<-NULL
+batch_test_model<-function(x){
+  temp_feature=subset(Sanger_test,Gene_symbol==x)
+  feature=matrix(as.numeric(as.vector(unlist(temp_feature[,3:12]))),byrow=F,ncol=10)
+  feature[which(is.nan(feature))]=0
+  essentiality=as.numeric(as.vector(unlist(temp_feature[,13])))
+  iterate_over_one_gene_model<-function(y){
+    model=readRDS(paste0("RPgene_2_Round_",y[1],"model_",y[2],".rds"))
+    pred_essential<-predict(model,feature)
+    predict_ess<<-c(predict_ess,pred_essential)
+    actual_ess<<-c(actual_ess,essentiality)
+    cor_coeff<-cor.test(pred_essential,essentiality,method="spearman")
+    correaltion_coeff<<-rbind(correaltion_coeff,c(x,cor_coeff$estimate,cor_coeff$p.value))
+  }
+  tem_result=apply(merge(1:5,1:5),1,iterate_over_one_gene_model)
+  
+}
+result=apply(matrix(unique(unlist(Sanger_test$Gene_symbol))[401:600]),1,batch_test_model)
+result=apply(matrix(unique(unlist(Sanger_test$Gene_symbol))[601:800]),1,batch_test_model)
+result=apply(matrix(unique(unlist(Sanger_test$Gene_symbol))[801:1000]),1,batch_test_model)
+result=apply(matrix(unique(unlist(Sanger_test$Gene_symbol))[1001:1200]),1,batch_test_model)
+result=apply(matrix(unique(unlist(Sanger_test$Gene_symbol))[1201:1400]),1,batch_test_model)
+result=apply(matrix(unique(unlist(Sanger_test$Gene_symbol))[1401:1600]),1,batch_test_model)
+result=apply(matrix(unique(unlist(Sanger_test$Gene_symbol))[1601:1817]),1,batch_test_model)
+
+saveRDS(predict_ess,file="/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Sanger_institute_data_to_Valid/Test_SVM_model_in_Sanger/Predict_ess_sanger.rds")
+saveRDS(actual_ess,file="/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Sanger_institute_data_to_Valid/Test_SVM_model_in_Sanger/Actual_ess_sanger.rds")
+saveRDS(correaltion_coeff,file="/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Sanger_institute_data_to_Valid/Test_SVM_model_in_Sanger/Sanger_gene_cor_in_DepMap_model.rds")
+```
+
+
+```{r}
+Sanger_gene_cor <- readRDS("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/SVM_model_reselect_feature_build_model/Sanger_gene_cor_in_DepMap_model.rds")
+Sanger_gene_cor=data.frame(Sanger_gene_cor)
+Sanger_gene_cor$rho=as.numeric(as.vector(unlist(Sanger_gene_cor$rho)))
+mean(as.numeric(as.vector(unlist(Sanger_gene_cor[,2]))),na.rm = T)
+gene_cor=aggregate(rho~V1, data=Sanger_gene_cor,mean)
+
+library(ggplot2)
+ggplot(gene_cor, aes(x=rho)) + 
+  geom_histogram(color="black", fill="white")
+ggsave("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/SVM_model_reselect_feature_build_model/DepMap_refine_feature_model_test_in_Sanger_data.pdf",height = 5)
+
+```
+
+
+
+```{r}
+#Compare the correlation of gene in DepMap data and Sanger datasets.
+Sanger_gene_cor <- readRDS("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/SVM_model_reselect_feature_build_model/Sanger_gene_cor_in_DepMap_model.rds")
+Sanger_gene_cor=data.frame(Sanger_gene_cor)
+Sanger_gene_cor$rho=as.numeric(as.vector(unlist(Sanger_gene_cor$rho)))
+mean(as.numeric(as.vector(unlist(Sanger_gene_cor[,2]))),na.rm = T)
+gene_cor=aggregate(rho~V1, data=Sanger_gene_cor,mean)
+
+PRgenes_correlation <- readRDS("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/SVM_model_reselect_feature_build_model/PRgenes_SVM_model_test_dataset_correlation.rds")
+class(PRgenes_correlation)
+PRgenes_correlation=data.frame(PRgenes_correlation)
+colnames(PRgenes_correlation)=c("Gene_id","Correlation","P_value")
+PRgenes_correlation$Correlation=as.numeric(as.vector(unlist(PRgenes_correlation$Correlation)))
+PRgene_cor=aggregate(Correlation ~ Gene_id, data = PRgenes_correlation, mean)
+
+gene=intersect(PRgene_cor$Gene_id,gene_cor$V1)
+
+SVM_model_cor=data.frame(Corr_DepMap=PRgene_cor$Correlation[match(gene,PRgene_cor$Gene_id)],Corr_Sanger=gene_cor$rho[match(gene,gene_cor$V1)])
+
+library(ggplot2)
+ggplot(SVM_model_cor, aes(x=Corr_DepMap, y=Corr_Sanger)) + geom_point()
+
+ggsave("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/SVM_model_reselect_feature_build_model/DepMap_Sanger_gene_correlation_SVM_model.pdf",height = 5)
+
+```
+
