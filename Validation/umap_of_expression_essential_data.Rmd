@@ -1,0 +1,155 @@
+---
+title: "Untitled"
+output: html_document
+---
+```{r}
+#using umap to reduce and shown in the plot.
+library(ggplot2)
+library("RColorBrewer", lib.loc="/Library/Frameworks/R.framework/Versions/3.5/Resources/library")
+library(umap)
+depmap_exp=read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_expression_raw.txt",header =F,sep="\t")
+tpm_matrix=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Expression_data/Sanger_RNASeq_TPM_used_test_performance.rds")
+dim(depmap_exp)
+dim(tpm_matrix)
+colnames(depmap_exp)=colnames(tpm_matrix)
+data_umap=rbind(depmap_exp,tpm_matrix)
+umap_result=umap(data_umap)
+d_tsne_train=as.data.frame(umap_result$layout)
+d_tsne_train$group=rep(c("DepMap raw TPM value", "Sanger raw TPM value"),c(554,325))
+train_figure=ggplot(d_tsne_train, aes(x=V1, y=V2,color=group)) + 
+  geom_point(size=0.25) +
+  guides(colour=guide_legend(override.aes=list(size=6))) +
+  xlab("") + ylab("") +
+  ggtitle("Umap for the expression value") +
+  theme_light(base_size=10) +
+  scale_colour_brewer(palette = "Set2")
+
+```
+
+```{r}
+#using umap to reduce and shown in the plot.
+library(umap)
+depmap_exp=read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_express_within_cellline_normal.txt",header =F,sep="\t")
+sanger_exp=read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_express_within_cellline_normal.txt",header=T,quote = "",sep="\t")
+dim(depmap_exp)
+dim(tpm_matrix)
+colnames(depmap_exp)=colnames(tpm_matrix)
+data_umap=rbind(depmap_exp,tpm_matrix)
+umap_result=umap(data_umap)
+d_tsne_train=as.data.frame(umap_result$layout)
+d_tsne_train$group=rep(c("DepMap within cell line 
+  normalized TPM value", "Sanger within cell line 
+  normalized TPM value"),c(554,325))
+train_figure=ggplot(d_tsne_train, aes(x=V1, y=V2,color=group)) + 
+  geom_point(size=0.25) +
+  guides(colour=guide_legend(override.aes=list(size=6))) +
+  xlab("") + ylab("") +
+  ggtitle("Umap for the expression value") +
+  theme_light(base_size=10) +
+  scale_colour_brewer(palette = "Set2")
+
+```
+
+
+```{r}
+library(umap)
+depmap_exp=read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_expression_with_cell.txt",header =F,sep="\t")
+sanger_exp=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Expression_data/Sanger_RNASeq_TPM_across_cell_Nor.txt",header=T,quote = "",sep="\t")
+dim(depmap_exp)
+dim(tpm_matrix)
+colnames(depmap_exp)=colnames(tpm_matrix)
+data_umap=rbind(depmap_exp,tpm_matrix)
+umap_result=umap(data_umap)
+d_tsne_train=as.data.frame(umap_result$layout)
+d_tsne_train$group=rep(c("DepMap across cell line 
+  normalized TPM value", "Sanger across cell line 
+  normalized TPM value"),c(554,325))
+train_figure=ggplot(d_tsne_train, aes(x=V1, y=V2,color=group)) + 
+  geom_point(size=0.25) +
+  guides(colour=guide_legend(override.aes=list(size=6))) +
+  xlab("") + ylab("") +
+  ggtitle("Umap for the expression value") +
+  theme_light(base_size=10) +
+  scale_colour_brewer(palette = "Set2")
+
+```
+
+
+
+
+
+
+
+
+```{r}
+#using umap to reduce and shown in the plot.
+#form now we look into essential data
+library(umap)
+depmap_exp=read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_essential_raw.txt",header =F,sep="\t")
+tpm_matrix=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score_number.rds")
+dim(depmap_exp)
+dim(tpm_matrix)
+colnames(depmap_exp)=colnames(tpm_matrix)
+data_umap=rbind(depmap_exp,tpm_matrix)
+umap_result=umap(data_umap)
+d_tsne_train=as.data.frame(umap_result$layout)
+d_tsne_train$group=rep(c("DepMap raw TPM value", "Sanger raw TPM value"),c(554,325))
+train_figure=ggplot(d_tsne_train, aes(x=V1, y=V2,color=group)) + 
+  geom_point(size=0.25) +
+  guides(colour=guide_legend(override.aes=list(size=6))) +
+  xlab("") + ylab("") +
+  ggtitle("Umap for the expression value") +
+  theme_light(base_size=10) +
+  scale_colour_brewer(palette = "Set2")
+
+```
+
+```{r}
+#using umap to reduce and shown in the plot.
+library(umap)
+depmap_exp=read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_express_within_cellline_normal.txt",header =F,sep="\t")
+sanger_exp=read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_express_within_cellline_normal.txt",header=T,quote = "",sep="\t")
+dim(depmap_exp)
+dim(tpm_matrix)
+colnames(depmap_exp)=colnames(tpm_matrix)
+data_umap=rbind(depmap_exp,tpm_matrix)
+umap_result=umap(data_umap)
+d_tsne_train=as.data.frame(umap_result$layout)
+d_tsne_train$group=rep(c("DepMap within cell line 
+  normalized TPM value", "Sanger within cell line 
+  normalized TPM value"),c(554,325))
+train_figure=ggplot(d_tsne_train, aes(x=V1, y=V2,color=group)) + 
+  geom_point(size=0.25) +
+  guides(colour=guide_legend(override.aes=list(size=6))) +
+  xlab("") + ylab("") +
+  ggtitle("Umap for the expression value") +
+  theme_light(base_size=10) +
+  scale_colour_brewer(palette = "Set2")
+
+```
+
+
+```{r}
+library(umap)
+depmap_exp=read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_expression_with_cell.txt",header =F,sep="\t")
+sanger_exp=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Expression_data/Sanger_RNASeq_TPM_across_cell_Nor.txt",header=T,quote = "",sep="\t")
+dim(depmap_exp)
+dim(tpm_matrix)
+colnames(depmap_exp)=colnames(tpm_matrix)
+data_umap=rbind(depmap_exp,tpm_matrix)
+umap_result=umap(data_umap)
+d_tsne_train=as.data.frame(umap_result$layout)
+d_tsne_train$group=rep(c("DepMap across cell line 
+  normalized TPM value", "Sanger across cell line 
+  normalized TPM value"),c(554,325))
+train_figure=ggplot(d_tsne_train, aes(x=V1, y=V2,color=group)) + 
+  geom_point(size=0.25) +
+  guides(colour=guide_legend(override.aes=list(size=6))) +
+  xlab("") + ylab("") +
+  ggtitle("Umap for the expression value") +
+  theme_light(base_size=10) +
+  scale_colour_brewer(palette = "Set2")
+
+```
+
+

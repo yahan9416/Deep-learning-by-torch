@@ -1,0 +1,183 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r}
+test_pre=as.matrix(read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Third_time_predict/Sanger_dataset_predict_result.txt",quote ="",sep="\t",fill=T,header=F,col.names=1:1319))
+test_pre=as.vector(unlist(test_pre))
+test_pre=unlist(lapply(strsplit(unlist(lapply(strsplit(test_pre,"\\("),function(x) x[2])),","),function(x) x[1]))
+
+test_pre=as.numeric(as.vector(test_pre))
+test_pre=matrix(test_pre,ncol=1319,byrow = F)
+
+integrate_test_pre<-NULL
+num_gene=c(1315,1315,1315,1315,1315,1315,1315,1315,1315,1319)
+star_index=seq(1,2969,325)
+integrate_pre<-function(x){
+integrate_test_pre<<-cbind(integrate_test_pre,test_pre[star_index[x]:(star_index[x]+324),1:num_gene[x]])  
+}
+apply(matrix(1:10),1,integrate_pre)
+#现在我们已经得到了最终在test数据集中的predict的结果。
+dim(integrate_test_pre)
+test_pre_1=test_pre[3251:4550,]
+integrate_test_pre_twice<-NULL
+num_gene=c(902,902,902,905)
+star_index=seq(1,976,325)
+integrate_pre<-function(x){
+integrate_test_pre_twice<<-cbind(integrate_test_pre_twice,test_pre_1[star_index[x]:(star_index[x]+324),1:num_gene[x]])  
+}
+apply(matrix(1:4),1,integrate_pre)
+#现在我们已经得到了最终在test数据集中的predict的结果。
+dim(integrate_test_pre_twice)
+
+test_pre_1=test_pre[4551:6500,]
+integrate_test_pre_third<-NULL
+num_gene=c(964,964,964,965,832,832)
+star_index=seq(1,421,84)
+integrate_pre<-function(x){
+integrate_test_pre_third<<-cbind(integrate_test_pre_third,test_pre_1[star_index[x]:(star_index[x]+324),1:num_gene[x]])  
+}
+apply(matrix(1:6),1,integrate_pre)
+#现在我们已经得到了最终在test数据集中的predict的结果。
+dim(integrate_test_pre_third)
+
+essen_gene=read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_essentiality_gene_order.txt",header = F,sep="\t")
+gene_neg=read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/model_performance/modify_number_gene_ess/Twice_predict_partial_gene/After_ten_cluster_gene_twice_negative_gene_order.txt",header=F,sep="\t")
+third_gene_order=read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/model_performance/modify_number_gene_ess/Third_predict_partial_gene/After_ten_cluster_gene_third_negative_gene_order.txt",header=F,sep="\t")
+index=match(gene_neg[,1],essen_gene[,1])
+integrate_test_pre[,index]=integrate_test_pre_twice
+index_1=match(third_gene_order[,1],essen_gene[,1])
+integrate_test_pre[,index_1]=integrate_test_pre_third
+
+
+
+write.table(integrate_test_pre,file="/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Sanger_dataset_third_predict_result.txt",sep="\t",col.names = F,row.names = F)
+```
+
+
+
+
+```{r}
+integrate_test_pre=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Sanger_dataset_third_predict_result.txt",header=F,sep="\t")
+colnames(integrate_test_pre)=essen_gene[,1]
+
+ccle_crispr <- readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Sanger_raw_crispr_test_DeepEss.rds")
+rownames(ccle_crispr)[c(106,107)]=c("NA1","NA2")
+newdepmap_normal <- readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Sanger_within_crispr_test_DeepEss.rds")
+colnames(newdepmap_normal)=colnames(ccle_crispr)
+rownames(newdepmap_normal)=rownames(ccle_crispr)
+rownames(integrate_test_pre)=rownames(ccle_crispr)
+gene=intersect(colnames(ccle_crispr),colnames(integrate_test_pre))
+ccle_crispr=ccle_crispr[,match(gene,colnames(ccle_crispr))]
+integrate_test_pre=integrate_test_pre[,match(gene,colnames(integrate_test_pre))]
+
+
+newdepmap_normal=newdepmap_normal[,match(gene,colnames(newdepmap_normal))]
+
+
+library(pROC)
+calculate_auc<-function(x){
+  cri_index=match(x,rownames(ccle_crispr))
+  cnn_index=match(x,rownames(integrate_test_pre))
+  #select the top10 percent of gene as cell line essential
+  temp=colnames(ccle_crispr)[order(as.numeric(as.vector(unlist(ccle_crispr[cri_index,]))))]
+nega_ess_gene=temp[1:1268]
+  pos_ess_gene=temp[11412:12681]
+  noness_gene=temp[3170:9510]
+  #from cell line essential gene remove the pan-cancer essential
+  
+
+#现在要开始计算CNN的AUC
+  pos_ess_gene_cnn=na.omit(match(pos_ess_gene,colnames(integrate_test_pre)))
+  noness_gene_cnn=na.omit(match(noness_gene,colnames(integrate_test_pre)))
+  nega_ess_gene_cnn=na.omit(match(nega_ess_gene,colnames(integrate_test_pre)))
+  #CNN的negative vs non-essential 
+  data_cnn=data.frame(cri_pre=unlist(c(integrate_test_pre[cnn_index,nega_ess_gene_cnn],integrate_test_pre[cnn_index,noness_gene_cnn])),gene_type=c(rep("essential_gene",length(nega_ess_gene_cnn)),rep("nonessential_gene",length(noness_gene_cnn))))
+cnn_auc_nega<-roc(data_cnn$gene_type,data_cnn$cri_pre)
+ #CNN的positive vs non-essential 
+  data_cnn=data.frame(cri_pre=unlist(c(integrate_test_pre[cnn_index,pos_ess_gene_cnn],integrate_test_pre[cnn_index,noness_gene_cnn])),gene_type=c(rep("essential_gene",length(pos_ess_gene_cnn)),rep("nonessential_gene",length(noness_gene_cnn))))
+cnn_auc_pos<-roc(data_cnn$gene_type,data_cnn$cri_pre)
+
+return(c(x,cnn_auc_nega$auc,cnn_auc_pos$auc))
+}
+result_prcurve=apply(matrix(rownames(integrate_test_pre)),1,calculate_auc)
+result_prcurve=t(result_prcurve)
+colnames(result_prcurve)=c("cell_line","Consensus_auc_nega","Consensus_auc_pos")
+result_prcurve=as.data.frame(result_prcurve)
+result_prcurve$Consensus_auc_nega=as.numeric(as.vector(result_prcurve$Consensus_auc_nega))
+result_prcurve$Consensus_auc_pos=as.numeric(as.vector(result_prcurve$Consensus_auc_pos))
+
+library(ggplot2)
+ggplot(result_prcurve, aes(x=Consensus_auc_nega)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("The distribution of negatively selected AUC for each sample")
+ggsave("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Sample_negative_AUC_dis.pdf")
+
+ggplot(result_prcurve, aes(x=Consensus_auc_pos)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("The distribution of positively selected AUC for each sample")
+ggsave("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Sample_posi_AUC_dis.pdf")
+
+saveRDS(result_prcurve,"/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Two_times_Predict_test_data_AUC.rds")
+
+
+
+cor_sample=apply(matrix(1:325),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(newdepmap_normal[x,]))),as.numeric(as.vector(unlist(integrate_test_pre[x,])))))[c(3,4)])
+cor_sample=t(cor_sample)
+data_cor_sample=data.frame(correlation=as.numeric(as.vector(unlist(cor_sample[,2]))))
+rownames(data_cor_sample)=rownames(integrate_test_pre)
+#看一下那些个AUC低的cell line，sample correlation也是同样低，并不是
+#也再去看一下是不是因为training cell line tissue的分布不同，导致的。
+integrate_test_pre[which(is.na(integrate_test_pre))]=0
+cor_gene=apply(matrix(1:12681),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(newdepmap_normal[,x]))),as.numeric(as.vector(unlist(integrate_test_pre[,x])))))[c(3,4)])
+cor_gene=t(cor_gene)
+data_cor_gene=data.frame(correlation=as.numeric(as.vector(unlist(cor_gene[,2]))))#69.5% gene are positive correlated
+
+saveRDS(data_cor_sample,"/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/twice_predicted_sample_corr.rds")
+saveRDS(data_cor_gene,"/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/twice_predicted_gene_cor.rds")
+
+library(ggplot2)
+ggplot(data_cor_sample, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("The distribution of sample correlation")
+ggsave("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/sample_cor.pdf")
+
+ggplot(data_cor_gene, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("The distribution of gene correlation")
+ggsave("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/gene_cor.pdf")
+
+#we also need to calculate AUC for each gene.
+#Just divide into two group, high vs. low
+library(pROC)
+calculate_auc<-function(x){
+  cri_index=match(x,colnames(ccle_crispr))
+  cnn_index=match(x,colnames(integrate_test_pre))
+  #select the top10 percent of gene as cell line essential
+  temp=rownames(ccle_crispr)[order(as.numeric(as.vector(unlist(ccle_crispr[,cri_index]))))]
+nega_ess_gene=temp[1:162]
+  pos_ess_gene=temp[163:325]
+  #from cell line essential gene remove the pan-cancer essential
+  
+
+#现在要开始计算CNN的AUC
+  pos_ess_gene_cnn=na.omit(match(pos_ess_gene,rownames(integrate_test_pre)))
+  nega_ess_gene_cnn=na.omit(match(nega_ess_gene,rownames(integrate_test_pre)))
+  #CNN的negative vs non-essential 
+  data_cnn=data.frame(cri_pre=unlist(c(integrate_test_pre[nega_ess_gene_cnn,cnn_index],integrate_test_pre[pos_ess_gene_cnn,cnn_index])),gene_type=c(rep("essential_gene",length(nega_ess_gene_cnn)),rep("nonessential_gene",length(pos_ess_gene_cnn))))
+cnn_auc_nega<-roc(data_cnn$gene_type,data_cnn$cri_pre)
+ #CNN的positive vs non-essential 
+
+
+return(c(x,cnn_auc_nega$auc))
+}
+result_prcurve=apply(matrix(colnames(integrate_test_pre)),1,calculate_auc)
+result_prcurve=t(result_prcurve)
+colnames(result_prcurve)=c("cell_line","Consensus_auc_nega")
+
+saveRDS(result_prcurve,"/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Twice_predict_gene_AUC.rds")
+result_prcurve=as.data.frame(result_prcurve)
+result_prcurve$Consensus_auc_nega=as.numeric(as.vector(result_prcurve$Consensus_auc_nega))
+ggplot(result_prcurve, aes(x=Consensus_auc_nega)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("The distribution of AUC for each gene")
+ggsave("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/gene_auc.pdf")
+```
+
+

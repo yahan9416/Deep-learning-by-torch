@@ -1,0 +1,71 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+
+```{r}
+Sanger_RNASeq_TPM <- readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_RNASeq_TPM.rds")
+Sanger_RNASeq_TPM_used_test_performance_13154 <- readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_RNASeq_TPM_used_test_performance_13154.rds")# used to decide the cell line used to test the performance
+index=match(rownames(Sanger_RNASeq_TPM_used_test_performance_13154),rownames(Sanger_RNASeq_TPM))
+Sanger_RNASeq_TPM=Sanger_RNASeq_TPM[index,]
+dim(Sanger_RNASeq_TPM)
+
+essential_order=as.vector(read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_expression_gene_order.txt",header=F,sep="\t"))
+index=match(essential_order[,1],colnames(Sanger_RNASeq_TPM))
+
+
+
+Sanger_RNASeq_TPM_linear=Sanger_RNASeq_TPM[,index]
+dim(Sanger_RNASeq_TPM_linear)
+Sanger_RNASeq_TPM_linear[which(is.na(Sanger_RNASeq_TPM_linear))]=0
+Sanger_RNASeq_TPM_linear[which(is.nan(Sanger_RNASeq_TPM_linear))]=0
+colnames(Sanger_RNASeq_TPM_linear)=essential_order[,1]
+
+Sanger_RNASeq_TPM_linear=t(scale(t(Sanger_RNASeq_TPM_linear),center = T,scale = T))
+write.table(Sanger_RNASeq_TPM_linear,file="/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Sanger_13154_within_gene_expression_used_test_DeepEss.txt",sep="\t",col.names = F,row.names = F,quote = F)
+
+```
+
+
+
+```{r}
+cell_line=rownames(Sanger_RNASeq_TPM_linear)
+
+crispr_score=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/EssentialityMatrices/01_corrected_logFCs.tsv",header=F,row.names = 1,sep="\t")
+cell_line_crisp=crispr_score[1,]
+
+cell_line_inf=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/model_list_latest.csv",sep=",",fill=T,quote="")
+index=match(as.vector(unlist(cell_line_crisp)),cell_line_inf[,2])
+cell_line_crisp=cell_line_inf[index,1]
+index=match(cell_line,cell_line_crisp)
+crispr_score=crispr_score[,index]
+crispr_score=crispr_score[-1,]
+gene_info=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/gene_identifiers_latest.csv",sep=",",fill=T,quote = "")
+essential_order<- readRDS("/Users/yahan/Desktop/predicted_gene_essential/ConsensusCluster_essentiality_result/integrate_three_times_gene_order.rds")
+
+gene_info[match(rownames(crispr_score),gene_info[,2]),]
+
+index=match(rownames(crispr_score),gene_info[,6])
+gene_temp=unlist(lapply(strsplit(as.vector(unlist(gene_info[index,4])),"\\."),function(x) x[1]))
+length(intersect(gene_temp,essential_order))#12710个基因有crisp  score.
+gene_ess_sange=intersect(essential_order,gene_temp)
+index=match(gene_ess_sange,gene_temp)
+crispr_score=crispr_score[index,]
+rownames(crispr_score)=gene_ess_sange
+colnames(crispr_score)=cell_line
+crispr_score=t(crispr_score)
+
+saveRDS(crispr_score,file="/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Sanger_raw_crispr_test_DeepEss.rds")
+crispr_score1=matrix(as.numeric(as.vector(unlist(crispr_score))),nrow=325)
+crispr_score=t(scale(t(crispr_score1),center=T,scale = T))
+saveRDS(crispr_score,file="/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Sanger_within_crispr_test_DeepEss.rds")
+
+```
+```{r}
+crispr_score=as.matrix(read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Sanger_13154_within_gene_expression_used_test_DeepEss.txt",header=F,sep="\t"))
+crispr_score[which(is.na(crispr_score))]=0
+
+write.table(crispr_score,file="/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184_gene_test_DeepEss_perfor/Sanger_13154_within_gene_expression_used_test_DeepEss.txt",sep="\t",col.names = F,row.names = F,quote = F)
+```
+

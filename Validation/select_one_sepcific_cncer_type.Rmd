@@ -1,0 +1,20 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+
+```{r}
+#generate dataset select the cell line belong to the same cancer type.
+sanger_cell_line=read.csv("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/model_list_latest.csv",header = T)
+sanger_ess=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Sanger_13184gene_test_linear_model_performance/process_crispr_test_linear_model.rds")
+sanger_cell_line=sanger_cell_line[match(rownames(sanger_ess),sanger_cell_line$model_id),]
+
+table(sanger_cell_line$cancer_type)
+  
+#Colorectal Carcinoma 有30个
+#所以我们选30个cell line
+
+
+```
+

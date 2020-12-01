@@ -1,0 +1,121 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r}
+#test the correlation of sanger and broad(DepMap) crispr dataset.
+depmap_cell_line=read.csv("/Users/yahan/Desktop/Predict_essential_score/last_time_updata_depmap_data/DepMap-2018q4-celllines_description.csv",header = T)
+depmap_ess=read.table("/Users/yahan/Desktop/Predict_essential_score/DepMap_exp_ess_remove_pan_add_drugcancer/DepMap_crispr_raw_data.txt",header=T,sep="\t")
+depmap_cell_line=depmap_cell_line[match(rownames(depmap_ess),depmap_cell_line$DepMap_ID),]
+
+sanger_cell_line=read.csv("/Users/yahan/Desktop/Predict_essential_score/Sanger_institute_data_Valid/model_list_latest.csv",header = T)
+sanger_ess=readRDS("/Users/yahan/Desktop/Predict_essential_score/Sanger_institute_data_Valid/Sanger_13184gene_test_linear_model_performance/process_crispr_test_linear_model.rds")
+sanger_cell_line=sanger_cell_line[match(rownames(sanger_ess),sanger_cell_line$model_id),]
+  
+
+#intersect the cell line
+overlap_cell_line=intersect(sanger_cell_line$model_name,depmap_cell_line$Aliases)
+length(overlap_cell_line)
+sanger_index=match(sanger_cell_line$model_id[match(overlap_cell_line,sanger_cell_line$model_name)],rownames(sanger_ess))
+
+depmap_index=match(depmap_cell_line$DepMap_ID[match(overlap_cell_line,depmap_cell_line$Aliases)],rownames(depmap_ess))
+depmap_gene_index=match(colnames(sanger_ess),unlist(lapply(strsplit(colnames(depmap_ess),"X"),function(x) x[2])))
+
+depmap_ess=depmap_ess[depmap_index,depmap_gene_index]
+sanger_ess=sanger_ess[sanger_index,]
+
+
+cor_gene_train=apply(matrix(1:115),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(depmap_ess[x,]))),as.numeric(as.vector(unlist(sanger_ess[x,])))))[c(3,4)])
+cor_gene_train=t(cor_gene_train)
+data_cor_gene_train=data.frame(correlation=as.numeric(as.vector(unlist(cor_gene_train[,2]))))
+
+library(ggplot2)
+p<-ggplot(data_cor_gene_train, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Correlation of Same cell lines essentiality in the Sanger and DepMap dataset")
+
+
+cor_gene_train=apply(matrix(1:12710),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(depmap_ess[,x]))),as.numeric(as.vector(unlist(sanger_ess[,x])))))[c(3,4)])
+cor_gene_train=t(cor_gene_train)
+data_cor_gene_train=data.frame(correlation=as.numeric(as.vector(unlist(cor_gene_train[,2]))))
+
+library(ggplot2)
+p<-ggplot(data_cor_gene_train, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Gene correlation of Same cell lines essentiality in the Sanger and DepMap dataset")
+ggsave(file="/Users/yahan/Desktop/Predict_essential_score/Sanger_institute_data_Valid/Test_correlation_same_cell_line/Gene_correlation_in_same_cell_line_DepMap_Sanger.pdf")
+
+#Now we need to calculate the correlation of PRgenes
+gene_symbol=read.table("/Users/yahan/Desktop/Predict_essential_score/PR_Gene_ten_feature_SVM/SVM_Model_in_DepMap_data/RP_genes_bioDBnet_symbol_to_id_manually_add.txt",header = T,sep="\t")
+
+
+index=na.omit(match(as.vector(unlist(gene_symbol$Homolog...Human.Gene.ID)),colnames(sanger_ess)))
+cor_gene_train=apply(matrix(index),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(depmap_ess[,x]))),as.numeric(as.vector(unlist(sanger_ess[,x])))))[c(3,4)])
+cor_gene_train=t(cor_gene_train)
+data_cor_gene_train=data.frame(correlation=as.numeric(as.vector(unlist(cor_gene_train[,2]))))
+
+
+library(ggplot2)
+p<-ggplot(data_cor_gene_train, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("PR Genes correlation in Same cell lines of the Sanger and DepMap dataset")
+ggsave(file="/Users/yahan/Desktop/Predict_essential_score/Sanger_institute_data_Valid/Test_correlation_same_cell_line/PRgene_correlation_in_same_cell_line_DepMap_Sanger.pdf")
+
+
+
+dep_index=match("X673",colnames(depmap_ess))
+sanger_index=match("673",colnames(sanger_ess))
+
+data=data.frame(Sanger_BRAF=as.numeric(as.vector(unlist(sanger_ess[,sanger_index]))),Depmap_BRAF=as.numeric(as.vector(unlist(depmap_ess[,dep_index]))))
+
+ggplot(data, aes(x=Sanger_BRAF, y=Depmap_BRAF)) + geom_point()
+ggsave(file="/Users/yahan/Desktop/Predict_essential_score/Sanger_institute_data_Valid/Test_correlation_same_cell_line/BRAF_in_same_cell_line_DepMap_Sanger.pdf")
+#1. Within sample
+#2. within gene
+#3. Within sample + within gene
+dim(depmap_ess)
+dim(sanger_ess)
+sanger_ess=matrix(as.numeric(as.vector(unlist(sanger_ess))),nrow=115,byrow = F)
+within_sanger_ess=t(scale(t(sanger_ess),center = T,scale = T))
+withi_depmap=t(scale(t(depmap_ess),center = T,scale = T))
+
+cor_gene_train=apply(matrix(1:115),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(withi_depmap[x,]))),as.numeric(as.vector(unlist(within_sanger_ess[x,])))))[c(3,4)])
+cor_gene_train=t(cor_gene_train)
+data_cor_gene_train=data.frame(correlation=as.numeric(as.vector(unlist(cor_gene_train[,2]))))
+
+library(ggplot2)
+p<-ggplot(data_cor_gene_train, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Within cell line normalizedSanger and DepMap dataset
+:Correlation of Same cell lines essentiality")
+
+
+#across cell line
+dim(depmap_ess)
+dim(sanger_ess)
+
+across_sanger_ess=scale(sanger_ess,center = T,scale = T)
+across_depmap=scale(depmap_ess,center = T,scale = T)
+
+cor_gene_train=apply(matrix(1:115),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(across_depmap[x,]))),as.numeric(as.vector(unlist(across_sanger_ess[x,])))))[c(3,4)])
+cor_gene_train=t(cor_gene_train)
+data_cor_gene_train=data.frame(correlation=as.numeric(as.vector(unlist(cor_gene_train[,2]))))
+
+library(ggplot2)
+p<-ggplot(data_cor_gene_train, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Across cell line normalized Sanger and DepMap dataset
+:Correlation of Same cell lines essentiality")
+
+
+#Within sample + within gene
+
+across_sanger_ess=scale(within_sanger_ess,center = T,scale = T)
+across_depmap=scale(withi_depmap,center = T,scale = T)
+
+cor_gene_train=apply(matrix(1:115),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(across_depmap[x,]))),as.numeric(as.vector(unlist(across_sanger_ess[x,])))))[c(3,4)])
+cor_gene_train=t(cor_gene_train)
+data_cor_gene_train=data.frame(correlation=as.numeric(as.vector(unlist(cor_gene_train[,2]))))
+
+library(ggplot2)
+p<-ggplot(data_cor_gene_train, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("Within cell line+ Across cell line normalized Sanger and DepMap dataset
+:Correlation of Same cell lines essentiality")
+```
+

@@ -1,0 +1,322 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r}
+#used to calculate the AUC value in test dataset.
+test_pre=read.table("/data/home/hanya/predict_essential/Within_cell_line_ten_model_pred_best_moodel/test_dataset_predict_result_within_cell_line.txt",quote = "",sep="\t")
+test_pre=as.vector(unlist(test_pre))
+test_pre=unlist(lapply(strsplit(unlist(lapply(strsplit(test_pre,"\\("),function(x) x[2])),","),function(x) x[1]))
+
+test_pre=as.numeric(as.vector(test_pre))
+test_pre=matrix(test_pre,ncol=1319,byrow = F)
+
+integrate_test_pre<-NULL
+num_gene=c(1315,1315,1315,1315,1315,1315,1315,1315,1315,1319)
+star_index=seq(1,2926,325)
+integrate_pre<-function(x){
+integrate_test_pre<<-cbind(integrate_test_pre,test_pre[star_index[x]:(star_index[x]+324),1:num_gene[x]])  
+}
+apply(matrix(1:10),1,integrate_pre)
+write.table(integrate_test_pre,file="/data/home/hanya/predict_essential/Within_cell_line_ten_model_pred_best_moodel/test_dataset_predict_result_within_process.txt",col.names = F,row.names = F,quote = F,sep="\t")
+
+```
+
+
+
+```{r}
+#Sanger_RNASeq_TPM_used_test_performance <- readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Expression_data/Sanger_RNASeq_TPM_used_test_performance.rds")
+cell_line=rownames(Sanger_RNASeq_TPM_used_test_performance)
+#saveRDS(cell_line,file="/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/EssentialityMatrices/cell_line_order.rds")
+
+crispr_score=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/EssentialityMatrices/01_corrected_logFCs.tsv",header=F,row.names = 1,sep="\t")
+cell_line_crisp=crispr_score[1,]
+
+cell_line_inf=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/model_list_latest.csv",sep=",",fill=T,quote="")
+index=match(as.vector(unlist(cell_line_crisp)),cell_line_inf[,2])
+cell_line_crisp=cell_line_inf[index,1]
+index=match(cell_line,cell_line_crisp)
+crispr_score=crispr_score[,index]
+crispr_score=crispr_score[-1,]
+gene_info=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/gene_identifiers_latest.csv",sep=",",fill=T,quote = "")
+essential_order=as.vector(unlist(read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_essentiality_gene_order.txt",quote = "",sep="\t")))
+
+gene_info[match(rownames(crispr_score),gene_info[,2]),]
+
+index=match(rownames(crispr_score),gene_info[,6])
+gene_temp=unlist(lapply(strsplit(as.vector(unlist(gene_info[index,4])),"\\."),function(x) x[1]))
+length(intersect(gene_temp,essential_order))
+gene_ess_sange=intersect(gene_temp,essential_order)
+index=match(gene_ess_sange,gene_temp)
+crispr_score=crispr_score[index,]
+rownames(crispr_score)=gene_ess_sange
+colnames(crispr_score)=cell_line
+crispr_score=t(crispr_score)
+
+saveRDS(crispr_score,file="/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score.rds")
+
+```
+
+
+
+
+
+
+```{r}
+#test performance
+across_cell=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/across_cell_line/test_dataset_predict_result_across_process.txt",header = F,sep="\t")
+cell_line=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/EssentialityMatrices/cell_line_order.rds")
+essential_order=as.vector(unlist(read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_essentiality_gene_order.txt",quote = "",sep="\t")))
+colnames(across_cell)=essential_order
+#其中106和107处的cell line名字为NA
+cell_line[106]="NA1"
+cell_line[107]="NA2"
+rownames(across_cell)=cell_line
+
+crispr_score=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score.rds")
+rownames(crispr_score)=cell_line
+
+
+library(pROC)
+calculate_auc<-function(x){
+  cri_index=match(x,rownames(crispr_score))
+  cnn_index=match(x,rownames(across_cell))
+  #select the top10 percent of gene as cell line essential
+  temp=colnames(crispr_score)[order(as.numeric(as.vector(unlist(crispr_score[cri_index,]))))]
+nega_ess_gene=temp[1:1268]
+  pos_ess_gene=temp[11413:12681]
+  noness_gene=temp[3170:9510]
+  #from cell line essential gene remove the pan-cancer essential
+#现在要开始计算CNN的AUC
+  index_neg=match(nega_ess_gene,colnames(across_cell))
+  index_pos=match(pos_ess_gene,colnames(across_cell))
+  index_non_ess=match(noness_gene,colnames(across_cell))
+  
+  #CNN的negative vs non-essential 
+  data_cnn=data.frame(cri_pre=unlist(c(across_cell[cnn_index,index_neg],across_cell[cnn_index,index_non_ess])),gene_type=c(rep("essential_gene",length(index_neg)),rep("nonessential_gene",length(index_non_ess))))
+cnn_auc_nega<-roc(data_cnn$gene_type,data_cnn$cri_pre)
+ #CNN的positive vs non-essential 
+  data_cnn=data.frame(cri_pre=unlist(c(across_cell[cnn_index,index_pos],across_cell[cnn_index,index_non_ess])),gene_type=c(rep("essential_gene",length(index_pos)),rep("nonessential_gene",length(index_non_ess))))
+cnn_auc_pos<-roc(data_cnn$gene_type,data_cnn$cri_pre)
+
+return(c(x,cnn_auc_nega$auc,cnn_auc_pos$auc))
+}
+result_prcurve=apply(matrix(cell_line),1,calculate_auc)
+result_prcurve=t(result_prcurve)
+colnames(result_prcurve)=c("cell_line","cnn_auc_nega","cnn_auc_pos")
+saveRDS(result_prcurve,"/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Across_cell_line_Norm_DeepEssentiality_AUC.rds")
+```
+
+
+
+
+
+
+
+```{r}
+#test performance
+within_cell=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Within_cell_line/test_dataset_predict_result_within_process.txt",header = F,sep="\t")
+cell_line=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/EssentialityMatrices/cell_line_order.rds")
+essential_order=as.vector(unlist(read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_essentiality_gene_order.txt",quote = "",sep="\t")))
+colnames(within_cell)=essential_order
+#其中106和107处的cell line名字为NA
+cell_line[106]="NA1"
+cell_line[107]="NA2"
+rownames(within_cell)=cell_line
+
+crispr_score=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score.rds")
+rownames(crispr_score)=cell_line
+
+
+library(pROC)
+calculate_auc<-function(x){
+  cri_index=match(x,rownames(crispr_score))
+  cnn_index=match(x,rownames(within_cell))
+  #select the top10 percent of gene as cell line essential
+  temp=colnames(crispr_score)[order(as.numeric(as.vector(unlist(crispr_score[cri_index,]))))]
+nega_ess_gene=temp[1:1268]
+  pos_ess_gene=temp[11413:12681]
+  noness_gene=temp[3170:9510]
+  #from cell line essential gene remove the pan-cancer essential
+#现在要开始计算CNN的AUC
+  index_neg=match(nega_ess_gene,colnames(within_cell))
+  index_pos=match(pos_ess_gene,colnames(within_cell))
+  index_non_ess=match(noness_gene,colnames(within_cell))
+  
+  #CNN的negative vs non-essential 
+  data_cnn=data.frame(cri_pre=unlist(c(within_cell[cnn_index,index_neg],within_cell[cnn_index,index_non_ess])),gene_type=c(rep("essential_gene",length(index_neg)),rep("nonessential_gene",length(index_non_ess))))
+cnn_auc_nega<-roc(data_cnn$gene_type,data_cnn$cri_pre)
+ #CNN的positive vs non-essential 
+  data_cnn=data.frame(cri_pre=unlist(c(within_cell[cnn_index,index_pos],within_cell[cnn_index,index_non_ess])),gene_type=c(rep("essential_gene",length(index_pos)),rep("nonessential_gene",length(index_non_ess))))
+cnn_auc_pos<-roc(data_cnn$gene_type,data_cnn$cri_pre)
+
+return(c(x,cnn_auc_nega$auc,cnn_auc_pos$auc))
+}
+result_prcurve=apply(matrix(cell_line),1,calculate_auc)
+result_prcurve=t(result_prcurve)
+colnames(result_prcurve)=c("cell_line","cnn_auc_nega","cnn_auc_pos")
+saveRDS(result_prcurve,"/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Within_cell_line_Norm_DeepEssentiality_AUC.rds")
+```
+
+
+
+
+```{r}
+library(ggplot2)
+Within_AUC <- readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Within_cell_line_Norm_DeepEssentiality_AUC.rds")
+Within_AUC=data.frame(Within_AUC)
+within_auc_neg=data.frame(AUC=c(as.numeric(as.vector(unlist(Within_AUC$cnn_auc_nega))),as.numeric(as.vector(unlist(Within_AUC$cnn_auc_pos)))),select_type=rep(c("Negatively selected","positively select"),each=325))
+ggplot(within_auc_neg,aes(x=AUC))+geom_histogram(color="black", fill="white")+facet_grid(select_type~.,scales="free")+ggtitle("The distribution of AUC in within DeepEssentility model")
+
+
+#Within_cell_line_normalized_DeepEss_AUC_distri
+across_AUC <- readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Across_cell_line_Norm_DeepEssentiality_AUC.rds")
+across_AUC=data.frame(across_AUC)
+Across_auc_neg=data.frame(AUC=c(as.numeric(as.vector(unlist(across_AUC$cnn_auc_nega))),as.numeric(as.vector(unlist(across_AUC$cnn_auc_pos)))),select_type=rep(c("Negatively selected","positively select"),each=325))
+ggplot(Across_auc_neg,aes(x=AUC))+geom_histogram(color="black", fill="white")+facet_grid(select_type~.,scales="free")+ggtitle("The distribution of AUC in across DeepEssentility model")
+```
+
+
+
+
+
+
+
+```{r}
+#得到经过normalized之后的CRISPR screen score.
+crispr_score=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score.rds")
+cell_line=rownames(crispr_score)
+gene=colnames(crispr_score)
+dim(crispr_score)
+crispr_score=matrix(as.numeric(as.vector(unlist(crispr_score))),byrow=F,nrow=325)
+rownames(crispr_score)=cell_line
+colnames(crispr_score)=gene
+saveRDS(crispr_score,file="/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score_number.rds")
+
+within_mor=t(scale(t(crispr_score),center = T,scale = T))
+saveRDS(within_mor,file="/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score_within_Norm.rds")
+
+across_nor=scale(crispr_score,scale = T,center = T)
+saveRDS(across_nor,file="/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score_across_cell_Norm.rds")
+
+```
+
+
+
+```{r}
+within_cell=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/Within_cell_line/test_dataset_predict_result_within_process.txt",header = F,sep="\t")
+cell_line=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/EssentialityMatrices/cell_line_order.rds")
+essential_order=as.vector(unlist(read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_essentiality_gene_order.txt",quote = "",sep="\t")))
+colnames(within_cell)=essential_order
+#其中106和107处的cell line名字为NA
+cell_line[106]="NA1"
+cell_line[107]="NA2"
+rownames(within_cell)=cell_line
+dim(within_cell)
+dim(crispr_score)
+#就按照真实的那个基因顺序来：
+index=match(colnames(crispr_score),colnames(within_cell))
+within_cell=within_cell[,index]
+within_mor=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score_within_Norm.rds")
+
+cor_sample=apply(matrix(1:325),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(within_mor[x,]))),as.numeric(as.vector(unlist(within_cell[x,])))))[c(3,4)])
+cor_sample=t(cor_sample)
+data_cor_sample=data.frame(correlation=as.numeric(as.vector(unlist(cor_sample[,2]))))
+rownames(data_cor_sample)=cell_line
+
+
+
+cor_gene=apply(matrix(1:12681),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(crispr_score[,x]))),as.numeric(as.vector(unlist(within_cell[,x])))))[c(3,4)])
+cor_gene=t(cor_gene)
+data_cor_gene=data.frame(correlation=as.numeric(as.vector(unlist(cor_gene[,2]))))
+
+library(ggplot2)
+p<-ggplot(data_cor_sample, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("The distribution of sample correlation")
+
+p<-ggplot(data_cor_gene, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("The distribution of gene correlation")
+
+
+match("SIDM00419",cell_line)
+data=data.frame(Actual_esse_score=as.numeric(as.vector(unlist(crispr_score[309,]))),predicted_ess_score=as.numeric(as.vector(unlist(within_cell[309,]))))
+p<-ggplot(data,aes(x=Actual_esse_score,y=predicted_ess_score))+geom_point()
+```
+
+
+
+
+
+
+```{r}
+
+across_nor=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score_across_cell_Norm.rds")
+
+across_cell=read.table("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/across_cell_line/test_dataset_predict_result_across_process.txt",header = F,sep="\t")
+cell_line=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/EssentialityMatrices/cell_line_order.rds")
+essential_order=as.vector(unlist(read.table("/Users/yahan/Desktop/predicted_gene_essential/Cluster_gene_based_essentiality/DepMap_gene_essentiality_gene_order.txt",quote = "",sep="\t")))
+colnames(across_cell)=essential_order
+#其中106和107处的cell line名字为NA
+cell_line[106]="NA1"
+cell_line[107]="NA2"
+rownames(across_cell)=cell_line
+dim(across_cell)
+dim(across_nor)
+#就按照真实的那个基因顺序来：
+index=match(colnames(across_nor),colnames(across_cell))
+across_cell=across_cell[,index]
+
+
+cor_sample=apply(matrix(1:325),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(across_nor[x,]))),as.numeric(as.vector(unlist(across_cell[x,])))))[c(3,4)])
+cor_sample=t(cor_sample)
+data_cor_sample=data.frame(correlation=as.numeric(as.vector(unlist(cor_sample[,2]))))
+rownames(data_cor_sample)=cell_line
+
+
+
+cor_gene=apply(matrix(1:12681),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(crispr_score[,x]))),as.numeric(as.vector(unlist(across_cell[,x])))))[c(3,4)])
+cor_gene=t(cor_gene)
+data_cor_gene=data.frame(correlation=as.numeric(as.vector(unlist(cor_gene[,2]))))
+
+library(ggplot2)
+p<-ggplot(data_cor_sample, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("The distribution of sample correlation")
+
+p<-ggplot(data_cor_gene, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("The distribution of gene correlation")
+
+
+match("SIDM00469",cell_line)
+data=data.frame(Actual_esse_score=as.numeric(as.vector(unlist(crispr_score[255,]))),predicted_ess_score=as.numeric(as.vector(unlist(across_cell[255,]))))
+p<-ggplot(data,aes(x=Actual_esse_score,y=predicted_ess_score))+geom_point()
+
+```
+
+
+
+
+
+```{r}
+crispr_score=readRDS(file="/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score_number.rds")
+
+within_mor=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score_within_Norm.rds")
+
+across_nor=readRDS("/Users/yahan/Desktop/predicted_gene_essential/Sanger_institute_data_Valid/process_crispr_correct_logFC_score_across_cell_Norm.rds")
+
+
+cor_sample=apply(matrix(1:325),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(across_nor[x,]))),as.numeric(as.vector(unlist(crispr_score[x,])))))[c(3,4)])
+cor_sample=t(cor_sample)
+data_cor_sample_across=data.frame(correlation=as.numeric(as.vector(unlist(cor_sample[,2]))))
+
+p<-ggplot(data_cor_sample_across, aes(x=correlation)) + 
+  geom_histogram(color="black", fill="white")+ggtitle("The distribution of sample correlation 
+between raw crispr data and across normalized crispr data")
+
+cor_sample=apply(matrix(1:325),1,function(x) unlist(cor.test(as.numeric(as.vector(unlist(within_mor[x,]))),as.numeric(as.vector(unlist(crispr_score[x,])))))[c(3,4)])
+cor_sample=t(cor_sample)
+data_cor_sample=data.frame(correlation=as.numeric(as.vector(unlist(cor_sample[,2]))))
+
+```
+
+
