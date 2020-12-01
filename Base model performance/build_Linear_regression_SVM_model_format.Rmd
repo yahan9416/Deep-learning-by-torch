@@ -1,0 +1,260 @@
+---
+title: "Generate the data of Using 10 feature to build model. "
+output: html_document
+---
+
+```{r}
+#try to using SVM and linear regression to select which kind of correlation between expression and essentiality is better.
+
+#xgboost model build linear regression
+co_exp_ess=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Gene_posi_top10_Co_Exp_Ess_across_expression.rds")
+essentiality=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Crispr_across_cell_Line_normalized.rds")
+#generate 
+#which(unique(top_neigh[,1]) !=rownames(essentiality))
+#which(unique(top_neigh[,2]) !=colnames(essentiality))
+co_exp_ess$essentiality=as.vector(essentiality)
+library(xgboost)
+library(stringr)
+setwd("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_selection_linear_model/Co_exp_ess_Neigative")
+#train_model_pre<-NULL
+test_model_pre<-NULL
+model<-list()
+one_gene_model<-function(gene){
+  index=which(co_exp_ess[,2] == gene)
+  dtrain=xgb.DMatrix(data=as.matrix(co_exp_ess[index[1:385],3:12]),label=matrix(as.numeric(as.vector(unlist(co_exp_ess[index[1:385],13])))))
+  param <- list(objective = "reg:linear",max_depth = 1, eta = 0.01, nthread = 12)
+  model_train <- xgb.cv(params=param,data=dtrain, silent = 1,eval_metric = "rmse",nrounds=3000,verbose = 2,seed=1,nfold = 3,num_boost_round=500,early_stopping_rounds=10,verbose_eval=1) 
+  
+  bst_model=xgboost(data=dtrain,params=param,silent = 1,eval_metric = "rmse",nrounds=model_train$best_iteration,verbose = 2,seed=1,verbose_eval=1)
+  y_pre=predict(bst_model,dtrain)
+  #train_model_pre<<-cbind(train_model_pre,y_pre)
+  dtest=xgb.DMatrix(data=as.matrix(co_exp_ess[index[386:551],3:12]))
+  y_pre=predict(bst_model,dtest)
+  test_model_pre<<-cbind(test_model_pre,y_pre)
+  model<<-c(model,gene<-list(bst_model))
+}
+result=apply(matrix(as.vector(unique(co_exp_ess[,2]))),1,one_gene_model)
+
+saveRDS(test_model_pre,file="posi_linear_model_test_predict.rds")
+#saveRDS(train_model_pre,file="linear_model_train_predict.rds")
+saveRDS(model,file="posi_model.rds")
+
+
+##########################################################################
+##########################################################################
+#try to using SVM to select which kind of correlation between expression and essentiality is better.
+co_exp_ess=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Gene_posi_top10_Co_Exp_Ess_across_expression.rds")
+essentiality=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Crispr_across_cell_Line_normalized.rds")
+co_exp_ess$Essentiality=as.vector(essentiality)
+library(e1071)
+setwd("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_selection_linear_model/Co_exp_ess_SVM")
+#train_model_pre<-NULL
+test_model_pre<-NULL
+model<-list()
+correaltion_coeff<<-NULL
+one_gene_model<-function(gene){
+  index=which(co_exp_ess[,2] == gene)
+  dtrain=co_exp_ess[index[1:385],3:13]
+  temp_test_fea=co_exp_ess[index[386:551],3:12]
+
+  model_one_gene_1=svm(Essentiality~.,data=dtrain,type="eps-regression",cross=5)
+  pred_essential<-predict(model_one_gene_1,temp_test_fea)
+  cor_coeff<-cor.test(pred_essential,co_exp_ess[index[386:551],13],method="spearman")
+  test_model_pre<<-rbind(test_model_pre,pred_essential)
+  correaltion_coeff<<-rbind(correaltion_coeff,c(gene,cor_coeff$estimate,cor_coeff$p.value))
+  model<<-c(model,gene<-list(model_one_gene_1))
+}
+result=apply(matrix(as.vector(unique(co_exp_ess[,2]))),1,one_gene_model)
+
+saveRDS(test_model_pre,file="posi_SVM_test_predict.rds")
+saveRDS(correaltion_coeff,file="posi_SVM_train_predict.rds")
+saveRDS(model,file="posi_SVM_model.rds")
+```
+
+
+```{r}
+#now we try to build linear regression for co_exp feature
+co_exp_ess=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Gene_top10_CoExp_across_expression.rds")
+essentiality=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Crispr_across_cell_Line_normalized.rds")
+#generate 
+#which(unique(top_neigh[,1]) !=rownames(essentiality))
+#which(unique(top_neigh[,2]) !=colnames(essentiality))
+co_exp_ess$essentiality=as.vector(essentiality)
+library(xgboost)
+library(stringr)
+setwd("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_selection_linear_model/Co_exp_linear_regression")
+#train_model_pre<-NULL
+test_model_pre<-NULL
+correaltion_coeff<<-NULL
+model<-list()
+one_gene_model<-function(gene){
+  index=which(co_exp_ess[,2] == gene)
+  dtrain=xgb.DMatrix(data=as.matrix(co_exp_ess[index[1:385],3:12]),label=matrix(as.numeric(as.vector(unlist(co_exp_ess[index[1:385],13])))))
+  param <- list(objective = "reg:linear",max_depth = 1, eta = 0.01, nthread = 12)
+  model_train <- xgb.cv(params=param,data=dtrain, silent = 1,eval_metric = "rmse",nrounds=3000,verbose = 2,seed=1,nfold = 3,num_boost_round=500,early_stopping_rounds=10,verbose_eval=1) 
+  
+  bst_model=xgboost(data=dtrain,params=param,silent = 1,eval_metric = "rmse",nrounds=model_train$best_iteration,verbose = 2,seed=1,verbose_eval=1)
+  y_pre=predict(bst_model,dtrain)
+  #train_model_pre<<-cbind(train_model_pre,y_pre)
+  dtest=xgb.DMatrix(data=as.matrix(co_exp_ess[index[386:551],3:12]))
+  y_pre=predict(bst_model,dtest)
+  
+  cor_coeff<-cor.test(y_pre,co_exp_ess[index[386:551],13],method="spearman")
+  correaltion_coeff<<-rbind(correaltion_coeff,c(gene,cor_coeff$estimate,cor_coeff$p.value))
+  test_model_pre<<-cbind(test_model_pre,y_pre)
+  model<<-c(model,gene<-list(bst_model))
+}
+result=apply(matrix(as.vector(unique(co_exp_ess[,2]))),1,one_gene_model)
+
+saveRDS(test_model_pre,file="posi_linear_model_test_predict.rds")
+#saveRDS(train_model_pre,file="linear_model_train_predict.rds")
+saveRDS(model,file="posi_model.rds")
+saveRDS(correaltion_coeff,file="test_data_correlation.rds")
+```
+
+
+
+
+```{r}
+#now we try to build linear regression for co_ess feature
+
+co_exp_ess=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Gene_top10_CoEss_across_expression.rds")
+essentiality=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Crispr_across_cell_Line_normalized.rds")
+#generate 
+#which(unique(top_neigh[,1]) !=rownames(essentiality))
+#which(unique(top_neigh[,2]) !=colnames(essentiality))
+co_exp_ess$essentiality=as.vector(essentiality)
+library(xgboost)
+library(stringr)
+setwd("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_selection_linear_model/Co_ess_linear_regression")
+#train_model_pre<-NULL
+test_model_pre<-NULL
+correaltion_coeff<<-NULL
+model<-list()
+one_gene_model<-function(gene){
+  index=which(co_exp_ess[,2] == gene)
+  dtrain=xgb.DMatrix(data=as.matrix(co_exp_ess[index[1:385],3:12]),label=matrix(as.numeric(as.vector(unlist(co_exp_ess[index[1:385],13])))))
+  param <- list(objective = "reg:linear",max_depth = 1, eta = 0.01, nthread = 12)
+  model_train <- xgb.cv(params=param,data=dtrain, silent = 1,eval_metric = "rmse",nrounds=3000,verbose = 2,seed=1,nfold = 3,num_boost_round=500,early_stopping_rounds=10,verbose_eval=1) 
+  
+  bst_model=xgboost(data=dtrain,params=param,silent = 1,eval_metric = "rmse",nrounds=model_train$best_iteration,verbose = 2,seed=1,verbose_eval=1)
+  y_pre=predict(bst_model,dtrain)
+  #train_model_pre<<-cbind(train_model_pre,y_pre)
+  dtest=xgb.DMatrix(data=as.matrix(co_exp_ess[index[386:551],3:12]))
+  y_pre=predict(bst_model,dtest)
+  
+  cor_coeff<-cor.test(y_pre,co_exp_ess[index[386:551],13],method="spearman")
+  correaltion_coeff<<-rbind(correaltion_coeff,c(gene,cor_coeff$estimate,cor_coeff$p.value))
+  test_model_pre<<-cbind(test_model_pre,y_pre)
+  model<<-c(model,gene<-list(bst_model))
+}
+result=apply(matrix(as.vector(unique(co_exp_ess[,2]))),1,one_gene_model)
+
+saveRDS(test_model_pre,file="posi_linear_model_test_predict.rds")
+#saveRDS(train_model_pre,file="linear_model_train_predict.rds")
+saveRDS(model,file="posi_model.rds")
+saveRDS(correaltion_coeff,file="test_data_correlation.rds")
+```
+
+
+```{r}
+#now we try to build linear regression for top10 neighbor feature
+
+co_exp_ess=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Gene_top10_neig_across_expression.rds")
+essentiality=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Crispr_across_cell_Line_normalized.rds")
+#generate 
+#which(unique(top_neigh[,1]) !=rownames(essentiality))
+#which(unique(top_neigh[,2]) !=colnames(essentiality))
+co_exp_ess$essentiality=as.vector(essentiality)
+library(xgboost)
+library(stringr)
+setwd("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_selection_linear_model/Top_10_neighbor_linear_regression")
+#train_model_pre<-NULL
+test_model_pre<-NULL
+correaltion_coeff<<-NULL
+model<-list()
+one_gene_model<-function(gene){
+  index=which(co_exp_ess[,2] == gene)
+  dtrain=xgb.DMatrix(data=as.matrix(co_exp_ess[index[1:385],3:12]),label=matrix(as.numeric(as.vector(unlist(co_exp_ess[index[1:385],13])))))
+  param <- list(objective = "reg:linear",max_depth = 1, eta = 0.01, nthread = 12)
+  model_train <- xgb.cv(params=param,data=dtrain, silent = 1,eval_metric = "rmse",nrounds=3000,verbose = 2,seed=1,nfold = 3,num_boost_round=500,early_stopping_rounds=10,verbose_eval=1) 
+  
+  bst_model=xgboost(data=dtrain,params=param,silent = 1,eval_metric = "rmse",nrounds=model_train$best_iteration,verbose = 2,seed=1,verbose_eval=1)
+  y_pre=predict(bst_model,dtrain)
+  #train_model_pre<<-cbind(train_model_pre,y_pre)
+  dtest=xgb.DMatrix(data=as.matrix(co_exp_ess[index[386:551],3:12]))
+  y_pre=predict(bst_model,dtest)
+  
+  cor_coeff<-cor.test(y_pre,co_exp_ess[index[386:551],13],method="spearman")
+  correaltion_coeff<<-rbind(correaltion_coeff,c(gene,cor_coeff$estimate,cor_coeff$p.value))
+  test_model_pre<<-cbind(test_model_pre,y_pre)
+  model<<-c(model,gene<-list(bst_model))
+}
+result=apply(matrix(as.vector(unique(co_exp_ess[,2]))),1,one_gene_model)
+
+saveRDS(test_model_pre,file="posi_linear_model_test_predict.rds")
+#saveRDS(train_model_pre,file="linear_model_train_predict.rds")
+saveRDS(model,file="posi_model.rds")
+saveRDS(correaltion_coeff,file="test_data_correlation.rds")
+```
+
+
+
+
+
+
+```{r}
+#
+#xgboost model build linear regression
+co_exp_ess=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Gene_abs_top20_Co_Exp_Ess_across_expression.rds")
+essentiality=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Crispr_across_cell_Line_normalized.rds")
+co_exp_ess=co_exp_ess[,1:17]
+co_exp_ess$essentiality=as.vector(essentiality)
+library("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_selection_linear_model/Co_exp_ess_Line_regression/Co_exp_ess_Abs_top15")
+#train_model_pre<-NULL
+test_model_pre<-NULL
+model<-list()
+one_gene_model<-function(gene){
+  index=which(co_exp_ess[,2] == gene)
+  dtrain=xgb.DMatrix(data=as.matrix(co_exp_ess[index[1:385],3:17]),label=matrix(as.numeric(as.vector(unlist(co_exp_ess[index[1:385],18])))))
+  param <- list(objective = "reg:linear",max_depth = 1, eta = 0.01, nthread = 12)
+  model_train <- xgb.cv(params=param,data=dtrain, silent = 1,eval_metric = "rmse",nrounds=3000,verbose = 2,seed=1,nfold = 3,num_boost_round=500,early_stopping_rounds=10,verbose_eval=1) 
+  
+  bst_model=xgboost(data=dtrain,params=param,silent = 1,eval_metric = "rmse",nrounds=model_train$best_iteration,verbose = 2,seed=1,verbose_eval=1)
+  y_pre=predict(bst_model,dtrain)
+  #train_model_pre<<-cbind(train_model_pre,y_pre)
+  dtest=xgb.DMatrix(data=as.matrix(co_exp_ess[index[386:551],3:17]))
+  y_pre=predict(bst_model,dtest)
+  test_model_pre<<-cbind(test_model_pre,y_pre)
+  model<<-c(model,gene<-list(bst_model))
+}
+result=apply(matrix(as.vector(unique(co_exp_ess[,2]))),1,one_gene_model)
+
+saveRDS(test_model_pre,file="Abs_cor_top15_linear_model_test_predict.rds")
+#saveRDS(train_model_pre,file="linear_model_train_predict.rds")
+saveRDS(model,file="pAbs_cor_top15_linear_model.rds")
+
+```
+
+
+
+
+
+
+
+
+```{r}
+#Model with 30 features (10 PPI+10 cell line specific+ 10 GO )
+#the input data of line-regress is same with SVM model.
+#exception the neighbor gene expression the pca result for each gene are same.
+#colnames(temp_train)<-c("Gene_symbol","Cell_line","Feat1","Feat2","Feat3","Feat4","Feat5","Feat6","Feat7","Feat8","Feat9","Feat10","Essentiality")
+
+cell_line_pca=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Exp_acr_normal_pca_Comp_score.rds")
+go_term_pca=readRDS("/mnt/Storage/home/hanya/project/Predict_essentiality_based_expression/Feature_collect/Feature_collect_result/Gene_Go_term_matrix_pca_Comp_score.rds")
+dim(top_neigh)
+dim(cell_line_pca)#16371   551,
+dim(go_term_pca)#16371    50
+
+```
+
+

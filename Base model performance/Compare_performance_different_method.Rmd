@@ -1,0 +1,148 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r}
+#For each gene using baseline method to build a model and then using the boxplot to show the performance of each method.
+#Features: Top 9 co-exp-ess and CNV 
+GB_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/GBR_regression_model_for_each_gene/top9_Abs_copy_comp_GBR_model_test_predict_correlation_dis.rds")
+Linear_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/LR_linear_regression_for_each_gene/top9_Abs_copy_comp_LR_model_test_predict_cor.rds")
+RF_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/RandomForest_for_each_gene/top9_Abs_copy_comp_RF_model_test_predictcor.rds")
+SVM_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_SVM/abs_SVM_test_predict_correlation.rds")
+XGboost_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top9_copy_number_linear/top9_Abs_copy_linear_model_test_predict_correlation.rds")
+Ridge_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Ridge_regression_for_each_gene/top9_Abs_copy_comp_RR_model_test_predict_correlation_dis.rds")
+data=data.frame(Pearson_Correlation_Score=c(SVM_regression$estimate.cor,XGboost_regression$estimate.cor,Linear_regression[,3],GB_regression[,3],Ridge_regression[,3],RF_regression[,3]),Regression_method=rep(c("SVM","XGboost","LR","GBR","Ridge","RF"),each=16371))
+data$Pearson_Correlation_Score=as.numeric(as.vector(data$Pearson_Correlation_Score))
+data$Regression_method=as.vector(unlist(data$Regression_method))
+
+library(ggplot2)
+library(RColorBrewer)
+ggplot(data, aes(x=Regression_method, y=Pearson_Correlation_Score, color=Regression_method)) + geom_violin()+theme_light()+
+  geom_boxplot()+scale_color_brewer(palette="Blues")+ theme(legend.position="bottom")+theme(axis.text.x = element_text(angle = 90),legend.position='none',axis.text.y = element_text(size=15))
+
++scale_x_discrete(limits=c("SVM","XGboost","LR","GBR","Ridge","RF"))
+ggsave("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Baseline_method_Gene_correlation_box.pdf",height=5)
+```
+
+
+
+```{r}
+#Features: Top 9 co-exp-ess and CNV 
+#Test sample correlation distribution.
+GB_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/GBR_regression_model_for_each_gene/top9_Abs_CNV_GBR_model_test_predict_sample_cor.rds")
+Linear_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/LR_linear_regression_for_each_gene/top9_Abs_CNV_LR_model_test_predict_sample_cor.rds")
+RF_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/RandomForest_for_each_gene/top9_Abs_copy_comp_RF_model_test_predict_sample_cor.rds")
+SVM_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_SVM/abs_SVM_test_predict_sample_corre.rds")
+XGboost_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top9_copy_number_linear/Top9_CNV_sample_correlation.rds")
+Ridge_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Ridge_regression_for_each_gene/top9_Abs_CNV_RR_model_test_predict_sample_Cor.rds")
+
+
+data=data.frame(Pearson_Correlation_Score=c(SVM_regression$estimate.cor,XGboost_regression$estimate.cor,Linear_regression$estimate.cor,GB_regression$estimate.cor,Ridge_regression$estimate.cor,RF_regression$Spearman.Correlation),Regression_method=rep(c("SVM","XGboost","LR","GBR","Ridge","RF"),each=166))
+data$Pearson_Correlation_Score=as.numeric(as.vector(data$Pearson_Correlation_Score))
+data$Regression_method=as.vector(unlist(data$Regression_method))
+result=aggregate(Pearson_Correlation_Score~Regression_method,data=data,mean)
+
+library(ggplot2)
+library(RColorBrewer)
+ggplot(data, aes(x=Regression_method, y=Pearson_Correlation_Score, color=Regression_method)) + geom_violin()+theme_light()+
+  geom_boxplot()+scale_color_brewer(palette="Blues")+ theme(legend.position="bottom")+theme(axis.text.x = element_text(angle = 90),legend.position='none',axis.text.y = element_text(size=15))+scale_x_discrete(limits=result$Regression_method[order(result$Pearson_Correlation_Score)])
+
+
+
+
+ggsave("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Baseline_method_Sample_correlation_box.pdf",height=5)
+```
+
+
+
+
+```{r}
+#Feature selection comparsion:
+Abs_top10_Co_exp_ess=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top10_abs_linear/Abs_linear_model_test_predict_gene_cor.rds")
+Neg_top10_Co_exp_ess=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_Negat_Posi/Neg_linear_model_test_predict_gene_cor.rds")
+Pos_top10_Co_exp_ess=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_Negat_Posi/Posi_linear_model_test_predict_gene_cor.rds")
+Top10_Co_exp=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_linear_regression/posi_linear_model_test_predict_gene_cor.rds")
+Top10_Co_ess=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_ess_linear_regression/posi_linear_model_test_predict_per_cor.rds")
+Abs_top9_Co_exp_ess_CNV=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top9_copy_number_linear/top9_Abs_copy_linear_model_test_predict_correlation.rds")
+Abs_top9_Co_exp_ess_NEST=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_Abs_cor_add_NEST/top9_Abs_NEST_other_gene_linear_model_test_pre_gene_cor.rds")
+Abs_top5_Co_exp_ess=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top5_abs_linear/top5_Abs_co_exp_ess_linear_model_test_predict_gene_cor.rds")
+Abs_top15_Co_exp_ess=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top15_abs_linear/Abs_cor_top15_linear_model_test_predict_gene_cor.rds")
+Abs_top20_Co_exp_ess=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top20_abs_linear/Abs_cor_top20_linear_model_test_predict_gene_cor.rds")
+Abs_top9_exp_ess_CNV_cell_line_PCA=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_9_CNV_Cell_line_PCA/top9_Abs_copy_cell_line_pca_linear_model_test_predict_gene_cor.rds")
+Top10_neig=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Top_10_neighbor_linear_regression/posi_linear_model_test_predict_gene_cor.rds")
+dim(Top10_neig)
+data_feature=data.frame(Pearson_Correlation_Score=c(Abs_top10_Co_exp_ess$estimate.cor,Neg_top10_Co_exp_ess$estimate.cor,Pos_top10_Co_exp_ess$estimate.cor,Top10_Co_exp$estimate.cor,Top10_Co_ess$estimate.cor,Abs_top9_Co_exp_ess_CNV$estimate.cor,Abs_top9_Co_exp_ess_NEST$estimate.cor,Abs_top5_Co_exp_ess$estimate.cor,Abs_top15_Co_exp_ess$estimate.cor,Abs_top20_Co_exp_ess$estimate.cor,Abs_top9_exp_ess_CNV_cell_line_PCA$estimate.cor,Top10_neig$estimate.cor),Feature=rep(c("Abs_top10_Co_exp_ess","Neg_top10_Co_exp_ess","Pos_top10_Co_exp_ess","Top10_Co_exp","Top10_Co_ess","Abs_top9_Co_exp_ess_CNV","Abs_top9_Co_exp_ess_NEST","Abs_top5_Co_exp_ess","Abs_top15_Co_exp_ess","Abs_top20_Co_exp_ess","Abs_top9_exp_ess_CNV_cell_line_PCA","Top10_neig"),each=16371))
+
+data_feature$Pearson_Correlation_Score=as.numeric(as.vector(data_feature$Pearson_Correlation_Score))
+result=aggregate(Pearson_Correlation_Score~Feature,data_feature,mean)
+
+
+library(ggplot2)
+library(RColorBrewer)
+ggplot(data_feature, aes(x=Feature, y=Pearson_Correlation_Score)) + geom_violin()+theme_light()+
+  geom_boxplot(outlier.alpha=0.3,outlier.size=0.5)+ theme(legend.position="bottom")+theme(axis.text.x = element_text(angle = 90),legend.position='none',axis.text.y = element_text(size=15))+scale_x_discrete(limits=result$Feature[order(result$Pearson_Correlation_Score)])
+ggsave("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Different_feature_Gene_correlation_box.pdf",height=7)
+```
+
+
+
+```{r}
+#Now we want to check whether exist the overfiting.
+GB_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/GBR_regression_model_for_each_gene/top9_Abs_copy_comp_GBR_model_test_predict_correlation_dis.rds")
+Linear_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/LR_linear_regression_for_each_gene/top9_Abs_copy_comp_LR_model_test_predict_cor.rds")
+RF_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/RandomForest_for_each_gene/top9_Abs_copy_comp_RF_model_test_predictcor.rds")
+SVM_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_SVM/abs_SVM_test_predict_correlation.rds")
+XGboost_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top9_copy_number_linear/top9_Abs_copy_linear_model_test_predict_correlation.rds")
+Ridge_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Ridge_regression_for_each_gene/top9_Abs_copy_comp_RR_model_test_predict_correlation_dis.rds")
+data=data.frame(Pearson_Correlation_Score=c(SVM_regression$estimate.cor,XGboost_regression$estimate.cor,Linear_regression[,3],GB_regression[,3],Ridge_regression[,3],RF_regression[,3]),Regression_method=rep(c("SVM","XGboost","LR","GBR","Ridge","RF"),each=16371),Dataset="Test dataset")
+
+GB_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/GBR_regression_model_for_each_gene/top9_Abs_copy_comp_GBR_model_train_predict_cor.rds")
+Linear_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/LR_linear_regression_for_each_gene/top9_Abs_copy_comp_LR_model_train_predict_cor.rds")
+RF_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/RandomForest_for_each_gene/RF_model_train_predict_gene_cor.rds")
+SVM_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_SVM/top9_Abs_copy_comp_svm_model_train_predict_cor.rds")
+XGboost_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top9_copy_number_linear/top9_Abs_copy_comp_xgboost_model_train_predict_cor.rds")
+Ridge_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Ridge_regression_for_each_gene/top9_Abs_copy_comp_Ridge_model_train_predict_cor.rds")
+data_train=data.frame(Pearson_Correlation_Score=c(SVM_regression[,3],XGboost_regression[,3],Linear_regression[,3],GB_regression[,3],Ridge_regression[,3],RF_regression[,2]),Regression_method=rep(c("SVM","XGboost","LR","GBR","Ridge","RF"),each=16371),Dataset="Train dataset")
+data=rbind(data,data_train)
+data$Pearson_Correlation_Score=as.numeric(as.vector(data$Pearson_Correlation_Score))
+data$Regression_method=as.vector(unlist(data$Regression_method))
+
+
+library(ggplot2)
+library(RColorBrewer)
+ggplot(data, aes(x=Regression_method, y=Pearson_Correlation_Score, color=Dataset)) + geom_violin()+theme_light()+
+  geom_boxplot()+scale_color_manual(values=c("#E69F00", "#56B4E9"))+ theme(legend.position="bottom")+theme(axis.text.x = element_text(angle = 90),axis.text.y = element_text(size=15))+scale_x_discrete(limits=c("SVM","XGboost","LR","GBR","Ridge","RF"))
+
+ggsave("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Baseline_method_train_test_gene_correlation_box.pdf",height=5)
+```
+
+```{r}
+GB_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/GBR_regression_model_for_each_gene/top9_Abs_CNV_GBR_model_test_predict_sample_cor.rds")
+Linear_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/LR_linear_regression_for_each_gene/top9_Abs_CNV_LR_model_test_predict_sample_cor.rds")
+RF_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/RandomForest_for_each_gene/top9_Abs_copy_comp_RF_model_test_predict_sample_cor.rds")
+SVM_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_SVM/abs_SVM_test_predict_sample_corre.rds")
+XGboost_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top9_copy_number_linear/Top9_CNV_sample_correlation.rds")
+Ridge_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Ridge_regression_for_each_gene/top9_Abs_CNV_RR_model_test_predict_sample_Cor.rds")
+data=data.frame(Pearson_Correlation_Score=c(SVM_regression$estimate.cor,XGboost_regression$estimate.cor,Linear_regression$estimate.cor,GB_regression$estimate.cor,Ridge_regression$estimate.cor,RF_regression$Spearman.Correlation),Regression_method=rep(c("SVM","XGboost","LR","GBR","Ridge","RF"),each=166),Dataset="Test dataset")
+
+GB_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/GBR_regression_model_for_each_gene/top9_Abs_copy_comp_GBR_model_train_sample_cor.rds")
+Linear_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/LR_linear_regression_for_each_gene/top9_Abs_copy_comp_LR_model_train_sample_cor.rds")
+RF_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/RandomForest_for_each_gene/RF_model_train_predict_sample_cor.rds")
+SVM_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_SVM/top9_Abs_copy_comp_svm_model_train_sample_cor.rds")
+XGboost_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Co_exp_ess_Linear_regression/Co_exp_ess_top9_copy_number_linear/top9_Abs_copy_comp_xgboost_model_train_sample_cor.rds")
+Ridge_regression=readRDS("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Ridge_regression_for_each_gene/top9_Abs_copy_comp_Ridge_model_train_sample_cor.rds")
+data_train=data.frame(Pearson_Correlation_Score=c(SVM_regression[,2],XGboost_regression[,2],Linear_regression[,2],GB_regression[,2],Ridge_regression[,2],RF_regression[,2]),Regression_method=rep(c("SVM","XGboost","LR","GBR","Ridge","RF"),each=385),Dataset="Train dataset")
+data=rbind(data,data_train)
+data$Pearson_Correlation_Score=as.numeric(as.vector(data$Pearson_Correlation_Score))
+data$Regression_method=as.vector(unlist(data$Regression_method))
+
+
+library(ggplot2)
+library(RColorBrewer)
+ggplot(data, aes(x=Regression_method, y=Pearson_Correlation_Score, color=Dataset)) + geom_violin()+theme_light()+
+  geom_boxplot()+scale_color_manual(values=c("#E69F00", "#56B4E9"))+ theme(legend.position="bottom")+theme(axis.text.x = element_text(angle = 90),axis.text.y = element_text(size=15))+scale_x_discrete(limits=c("SVM","XGboost","LR","GBR","Ridge","RF"))
+
+ggsave("/Users/yahan/Desktop/Predict_essential_score/Feature_selection_linear_model/Baseline_method_train_test_sample_correlation_box.pdf",height=5)
+```
+
